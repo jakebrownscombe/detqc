@@ -1,0 +1,1240 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mortality review: ST-02</title>
+<!-- Mortality review card from the detqc R package.
+     Self-contained: no library, no network. The data block below is
+     written by build_mortality_cards(); nothing else on the page is filled in R. -->
+<style>
+ :root{
+   --alive:#2c7fb8; --review:#d95f02; --dead:#c2202a;
+   --ink:#1a1a1a; --mute:#666; --rule:#e2e2e2; --key:#b9a44a;
+ }
+ *{box-sizing:border-box}
+ body{font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+      margin:0;margin-left:300px;padding:14px 18px 30px;color:var(--ink);background:#fff}
+ a{color:#12507a}
+ h1{font-size:18px;margin:0 0 2px}
+ .sub{color:var(--mute);font-size:12px;margin:0 0 8px}
+ code{background:#f3f3f3;padding:1px 4px;border-radius:3px}
+
+ .head{border:1px solid var(--rule);border-radius:6px;padding:12px 14px;background:#fcfcfc;margin-bottom:10px}
+ .facts .l1{font-size:16px;font-weight:700;margin-bottom:3px}
+ .facts .row{font-size:12px;color:#333;margin:2px 0}
+ .pill{display:inline-block;padding:1px 8px;border-radius:9px;font-size:11px;
+       font-weight:700;color:#fff;vertical-align:1px}
+ .pill.alive{background:var(--alive)} .pill.review{background:var(--review)}
+ .pill.dead{background:var(--dead)}
+
+ /* The readout sits beside the map at desktop widths, so the call bar loads in
+    view at 1500 x 1000; only a phone stacks them (media rule below). */
+ .upper{display:flex;gap:14px;align-items:flex-start;margin-bottom:8px}
+ .card{border:1px solid var(--rule);border-radius:6px;padding:8px 10px;background:#fff}
+ .card h2{font-size:12px;margin:0 0 6px;font-weight:700;color:#333;max-width:460px}
+ #map{display:block;cursor:default}
+ .readout{flex:1 1 0;min-width:250px}
+ #extentbtn{margin-top:4px;font-size:11px;padding:2px 7px}
+ .readout table{border-collapse:collapse;width:100%;font-size:12px}
+ .readout td{padding:2px 4px;border-bottom:1px solid #f0f0f0;vertical-align:top}
+ .readout td.k{color:var(--mute);width:52%}
+ .readout td.v{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+
+ #stickyzone{position:sticky;top:0;z-index:5;background:#fff}
+ #prog{display:block;width:100%;height:14px;cursor:pointer;border:1px solid #d8cf9a;
+       border-bottom:none;border-radius:6px 6px 0 0;background:#fff}
+ .adjud{display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+        border:1px solid var(--key);border-radius:6px;padding:8px 10px;margin-bottom:6px;background:#fffbe8}
+ .adjud .lab{font-size:11px;font-weight:700;color:#6b5a10}
+ .adjud button.callb{font-weight:700}
+ .adjud button.callb.on{color:#fff}
+ .adjud button.callb[data-c=alive].on{background:var(--alive);border-color:var(--alive)}
+ .adjud button.callb[data-c=dead_or_shed].on{background:var(--dead);border-color:var(--dead)}
+ .adjud button.callb[data-c=uncertain].on{background:#666;border-color:#666}
+ #deathdate{font-size:11px;color:#0a7d33;min-width:84px}
+ #deathinput{font:12px inherit;font-variant-numeric:tabular-nums;font-weight:700;color:#0a7d33;padding:2px 4px}
+ #hint{font-size:11px;color:#b3261e;min-width:0}
+ .votes{border-collapse:collapse;font-size:12px;margin-top:5px}
+ .votesbox{font-size:12px;margin-top:4px}
+ .votesbox summary{cursor:pointer;color:#333}
+ .votes td,.votes th{padding:1px 8px 1px 0;text-align:left;vertical-align:top}
+ .votes th{color:var(--mute);font-weight:600;font-size:11px}
+ .votes td:nth-child(3){white-space:nowrap}
+ .vote-dead{color:var(--dead);font-weight:700} .vote-alive{color:var(--alive);font-weight:700}
+ .vote-review{color:var(--review);font-weight:700}
+ #calltext{flex:1 1 180px;padding:4px 7px;font:12px inherit}
+ #navpos{font-size:11px;color:#555;font-variant-numeric:tabular-nums}
+ .transport{display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+            border:1px solid var(--rule);border-radius:6px;padding:8px 10px;margin-bottom:8px;background:#fafafa}
+ button{font:12px inherit;padding:4px 9px;cursor:pointer;border:1px solid #bbb;border-radius:4px;background:#fff}
+ button:hover{background:#f0f0f0}
+ button.on{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+ #slider{flex:1 1 260px;min-width:200px}
+ .grp{display:flex;gap:3px;align-items:center}
+ .grp .lab{font-size:11px;color:var(--mute);margin-right:2px}
+ #curdate{font-variant-numeric:tabular-nums;font-weight:700;min-width:88px;display:inline-block}
+
+ #stackwrap{border:1px solid var(--rule);border-radius:6px;padding:6px 8px 2px}
+ #stack{display:block;cursor:crosshair;width:100%;touch-action:pan-y}
+ .caption{font-size:10.5px;color:var(--mute);margin:6px 2px 10px;line-height:1.45;max-width:1200px}
+ .figkey{font-size:10.5px;color:#333;margin:4px 2px 0;line-height:1.7}
+ .figkey span{white-space:nowrap;margin-right:12px}
+ /* The map key wraps within the map's width, so that the readout keeps its
+    place beside the map and the call bar stays in the first screen. */
+ #mapkey{max-width:460px}
+ .figkey svg{vertical-align:middle;margin-right:4px}
+
+ .anno{border:1px solid var(--rule);border-radius:6px;padding:10px 12px;margin-top:10px}
+ .anno .rowf{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+ .anno input[type=text]{flex:1 1 320px;padding:5px 7px;font:12px inherit}
+ .anno select{padding:4px;font:12px inherit}
+ #notelist{margin-top:8px;font-size:12px}
+ #notelist div{padding:3px 0;border-bottom:1px solid #f2f2f2}
+ #notelist a{cursor:pointer;font-variant-numeric:tabular-nums;font-weight:600}
+ .kbd{font-size:10.5px;color:var(--mute);margin-top:6px}
+
+ #toc{position:fixed;top:0;left:0;width:300px;height:100vh;background:#fff;
+      border-right:2px solid var(--key);z-index:20;display:flex;flex-direction:column}
+ body.tocoff{margin-left:0}
+ body.tocoff #toc{display:none}
+ #tocpeek{display:none;position:fixed;left:0;top:40%;z-index:21;background:var(--key);color:#fff;
+   border:none;border-radius:0 8px 8px 0;padding:14px 6px;cursor:pointer;font-weight:700;
+   writing-mode:vertical-rl;font-size:11px;letter-spacing:0.08em}
+ body.tocoff #tocpeek{display:block}
+ #toc .tochead{padding:10px 12px;border-bottom:1px solid var(--rule);display:flex;gap:8px;align-items:center}
+ #toc .tochead input{flex:1;min-width:0;padding:5px 7px;font:12px inherit}
+ #toclist{flex:1;overflow-y:auto;font-size:12px}
+ #toclist .grph{position:sticky;top:0;background:#f4f1e2;border-top:1px solid var(--key);
+   border-bottom:1px solid var(--key);padding:4px 9px;font-weight:700;font-size:11px;color:#6b5c18;
+   display:flex;justify-content:space-between;z-index:2}
+ #toclist .row{display:flex;gap:6px;align-items:center;padding:3px 10px;cursor:pointer;
+               border-bottom:1px solid #f4f4f4;white-space:nowrap}
+ #toclist .row:hover{background:#f5f9ff}
+ #toclist .row.cur{background:#fffbe8;border-left:3px solid var(--key)}
+ #toclist .rk{color:#999;font-variant-numeric:tabular-nums;width:30px;text-align:right}
+ #toclist .fid{font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis}
+ #toclist .mine{font-weight:700;width:38px;font-size:10px;white-space:nowrap;text-align:left}
+ #toclist .nb{color:#5b2c8d;font-size:10px;font-weight:700}
+ #toc .tocfoot{padding:6px 12px;border-top:1px solid var(--rule);font-size:11px;color:#666}
+ /* A phone has no room for the sidebar beside the card: it opens over it. */
+ @media (max-width: 760px){
+   body{margin-left:0;padding:8px}
+   .upper{flex-wrap:wrap}
+   #toc{width:85vw;box-shadow:2px 0 8px rgba(0,0,0,0.25)}
+   body:not(.tocoff) #tocpeek{display:none}
+   #map{max-width:100%;height:auto !important}
+   .readout{min-width:0}
+   .readout td.k{white-space:normal}
+ }
+</style></head><body>
+
+<h1 id="h1"></h1>
+<p class="sub" id="sub"></p>
+
+<div class="head"><div class="facts" id="facts"></div></div>
+
+<div class="upper">
+  <div class="card">
+    <h2 id="maptitle"></h2>
+    <canvas id="map"></canvas>
+    <div class="figkey" id="mapkey"></div>
+    <button id="extentbtn" title="switch the map between this animal's stations and the whole array"></button>
+  </div>
+  <div class="card readout">
+    <h2 id="rotitle">Trailing window, read from the daily bins</h2>
+    <table id="rotab"></table>
+  </div>
+</div>
+
+<div id="stickyzone">
+<canvas id="prog" title="review progress: one segment per animal in review order; click to jump"></canvas>
+<div class="adjud">
+  <span class="lab">MY CALL</span>
+  <button class="callb" data-c="alive" title="key: A">alive</button>
+  <button class="callb" data-c="dead_or_shed" title="key: D or S. Detection data cannot separate the two.">dead/shed</button>
+  <button class="callb" data-c="uncertain" title="key: U">uncertain</button>
+  <span class="lab">DEATH</span>
+  <button id="deathbtn" title="key: X. Set the death date to the cursor date; move the cursor first.">= cursor</button>
+  <input type="date" id="deathinput" title="the death date of this call: type it, pick it, or set it from the cursor">
+  <span id="deathdate"></span>
+  <span id="hint"></span>
+  <input type="text" id="calltext" placeholder="note (optional)">
+  <button id="prevanimal" title="key: P">&#8592; prev</button>
+  <button id="nextanimal" title="key: N">next &#8594;</button>
+  <label style="font-size:11px"><input type="checkbox" id="autoadv" checked> advance on call</label>
+  <span id="navpos"></span>
+  <button id="tocbtn" title="key: C. Show or hide the review order.">sidebar</button>
+  <a href="../index.html" title="the index, with the CSV export">index</a>
+</div>
+<div class="transport">
+  <button id="playbtn">play</button>
+  <button id="stepb" title="back one day">&#8592;</button>
+  <button id="stepf" title="forward one day">&#8594;</button>
+  <input type="range" id="slider" min="0" max="1" value="0" step="1">
+  <span id="curdate"></span>
+  <span class="grp"><span class="lab">speed</span>
+    <button class="spd" data-v="1">1x</button>
+    <button class="spd" data-v="5">5x</button>
+    <button class="spd" data-v="20">20x</button></span>
+  <span class="grp"><span class="lab">window</span>
+    <button class="win" data-v="1">1 d</button>
+    <button class="win" data-v="7">7 d</button>
+    <button class="win" data-v="30">30 d</button>
+    <button class="win" data-v="90">90 d</button>
+    <button class="win" data-v="365">365 d</button></span>
+  <button id="wholebtn" title="show the whole record on the map">whole record</button>
+</div>
+</div>
+
+<div id="stackwrap"><canvas id="stack"></canvas></div>
+<div class="figkey" id="stackkey"></div>
+<p class="caption" id="caption"></p>
+
+<div class="anno">
+  <div class="rowf">
+    <b>note at <span id="annodate"></span></b>
+    <select id="annocall">
+      <option value="">(no call)</option><option value="alive">alive</option>
+      <option value="dead_or_shed">dead/shed</option><option value="uncertain">uncertain</option>
+    </select>
+    <input type="text" id="annotext" placeholder="what this window shows">
+    <button id="annosave">save</button>
+    <button id="annocsv">export notes (CSV)</button>
+    <button id="annoclear">clear notes for this animal</button>
+  </div>
+  <div id="notelist"></div>
+  <div class="kbd">Keys: left and right arrows step one day, shift and an arrow seven days, space plays or pauses,
+    home and end jump to the ends of the record. Click or drag on the time panels to scrub.
+    Calls: A alive, D or S dead or shed (one class: detection data cannot separate them), U uncertain;
+    each saves and, with advance on call, opens the next animal. N next animal, P previous animal, C the sidebar.
+    D stamps the candidate date when no death date is set; it never stamps the day in view. With no candidate,
+    D saves the call without a date, keeps the card open and asks for one: move the cursor to the death day and
+    press X, or type the date. X sets the death date to the cursor date once the cursor has moved, and moves a
+    date already set; the date field takes a typed date. The keys work after a click on the slider or a checkbox;
+    they pause while you type in a text or date field.</div>
+</div>
+
+<nav id="toc">
+  <div class="tochead"><b>Review order</b>
+    <input type="search" id="tocq" placeholder="filter: id, species, band, call">
+    <button id="tocclose" title="key: C">hide</button></div>
+  <div id="toclist"></div>
+  <div class="tocfoot"><span id="tocfoot"></span> &nbsp;
+    <button id="tocexport" title="download every call, death date and note as one CSV">export calls</button>
+    <button id="tocnotes" title="download every day note as one CSV">export notes</button></div>
+</nav>
+<button id="tocpeek" title="key: C">REVIEW ORDER</button>
+
+<script id="detqc-data" type="application/json">{"t0":"2024-06-02","nd":9,"source":"detqc 0.1.1; detset of 3,148 detections","store":"detqc_calls_mortality_review_3b154fb7f2","dmax":192,"animal":{"id":"ST-02","slug":"ST-02","species":"walleye","size":"length 0.468 (unit as recorded)","transmitters":["A69-9002-61002"],"tag_model":"V13P-1x","tag_life_days":650,"expiry":"2026-03-14","release":"2024-06-02","sensors":"depth","first":"2024-06-02","last":"2024-06-10","detection_days":9,"span_days":9,"detections":1237,"stations":3,"to_horizon":0,"to_expiry":642},"band":{"band":"dead","rule":"terminal_run","rule_label":"a final stationary run with no alive vote","death_date":"2024-06-03","death_time":"2024-06-03T15:05:39Z","basis":"the first detection of the final run","persistence":null,"rank":null,"of":null},"votes":[{"rule":"accel_flatline","label":"accelerometer","vote":"unavailable","date":null,"detail":"the stream returned no vote for this animal"},{"rule":"depth_flatline","label":"depth","vote":"dead","date":"2024-06-04","detail":"the day after the last day of varied depth; A69-9002-61002: 7 flat depth days to the end of the record (2 needed)"},{"rule":"movement_resumption","label":"movement","vote":"none","date":null,"detail":"0 days heard only more than 1 km from the 1 station heard on the first 3 detection days from the candidate date, 2024-06-03"},{"rule":"persistence","label":"persistence","vote":"none","date":null,"detail":"the stream returned no vote for this animal"},{"rule":"record_end","label":"record end","vote":"review","date":"2024-06-10","detail":"last detection 2024-06-10, 0 days before the data horizon (2024-06-10); the data horizon is the last detection in the detset, so the rules cannot see what followed"},{"rule":"site_listening","label":"site listening","vote":"none","date":null,"detail":"the data end 0 days after the last detection; record_end judges it"},{"rule":"terminal_run","label":"final run","vote":"dead","date":"2024-06-03","detail":"the first detection of the final run; the final run, 2024-06-03 to 2024-06-10, is at one site; its last 3 detection days, 2024-06-08 to 2024-06-10, span 0.000 km"}],"has":{"depth":true,"accel":false,"other":null,"other_unit":null,"raw_readings":0,"raw_classes":null},"series":{"dets":[24,54,138,186,180,187,190,192,86],"dep":[0.977,0.752,1.654,1.654,1.654,1.654,1.654,1.654,1.654],"depLo":[0.301,0.301,1.654,1.654,1.654,1.654,1.654,1.654,1.654],"depHi":[1.955,2.511,1.654,1.654,1.654,1.654,1.654,1.654,1.654],"acc":[null,null,null,null,null,null,null,null,null],"accLo":[null,null,null,null,null,null,null,null,null],"accHi":[null,null,null,null,null,null,null,null,null],"cx":[-78.162342,-78.162774,-78.162342,-78.162342,-78.162342,-78.162342,-78.162342,-78.162342,-78.162342],"cy":[44.560902,44.552027,44.560903,44.560903,44.560903,44.560903,44.560903,44.560903,44.560902],"step":[null,0.987,0.987,0,0,0,0,0,0]},"ds":[0,13,24,1,5,9,1,9,23,1,13,22,2,13,138,3,13,186,4,13,180,5,13,187,6,13,190,7,13,192,8,13,86],"sids":["S001","S002","S003","S004","S005","S006","S007","S008","S009","S010","S011","S012","S013","S014","S015","S016","S017","S018","S019","S020"],"dss":[0,10,24,1,5,9,1,7,23,1,10,22,2,10,138,3,10,186,4,10,180,5,10,187,6,10,190,7,10,192,8,10,86],"heard":[10,7,5],"streams":[{"label":"accelerometer","vote":"unavailable","state":"not available","day":null},{"label":"depth","vote":"dead","state":"dead vote","day":2},{"label":"movement","vote":"none","state":"no vote","day":null},{"label":"persistence","vote":"none","state":"no vote","day":null},{"label":"record end","vote":"review","state":"review vote","day":8},{"label":"site listening","vote":"none","state":"no vote","day":null},{"label":"final run","vote":"dead","state":"dead vote","day":1}],"stations":[{"id":"S001","lon":-78.214654,"lat":44.493772},{"id":"S002","lon":-78.197805,"lat":44.504163},{"id":"S003","lon":-78.197244,"lat":44.515852},{"id":"S004","lon":-78.180343,"lat":44.527139},{"id":"S007","lon":-78.148393,"lat":44.537148},{"id":"S006","lon":-78.163479,"lat":44.537524},{"id":"S005","lon":-78.179822,"lat":44.537929},{"id":"S010","lon":-78.131476,"lat":44.548428},{"id":"S009","lon":-78.147822,"lat":44.548837},{"id":"S008","lon":-78.16291,"lat":44.549213},{"id":"S014","lon":-78.114552,"lat":44.559704},{"id":"S013","lon":-78.130901,"lat":44.560116},{"id":"S012","lon":-78.14725,"lat":44.560526},{"id":"S011","lon":-78.162342,"lat":44.560902},{"id":"S017","lon":-78.049827,"lat":44.569752},{"id":"S016","lon":-78.066178,"lat":44.570174},{"id":"S015","lon":-78.082529,"lat":44.570593},{"id":"S020","lon":-78.049281,"lat":44.580541},{"id":"S019","lon":-78.065635,"lat":44.580963},{"id":"S018","lon":-78.081989,"lat":44.581382}],"marks":{"flag":1,"first":0,"horizon":8,"horizon_date":"2024-06-10","expiry":null,"release":0,"release_before":false,"data_start":"2024-06-02"},"nav":{"pos":1,"n":4,"prev_slug":null,"next_slug":"ST-01","order":[{"s":"ST-02","id":"ST-02","sp":"walleye","b":"dead","c":"2024-06-03"},{"s":"ST-01","id":"ST-01","sp":"walleye","b":"review","c":"2024-06-08"},{"s":"ST-03","id":"ST-03","sp":"walleye","b":"review","c":""},{"s":"ST-04","id":"ST-04","sp":"walleye","b":"review","c":""}]},"lake":{"bbox":[-78.2380532,44.4740668,-78.0049568,44.6008032],"rings":[{"x":[-78.1888,-78.18884,-78.18758,-78.18754,-78.1888],"y":[44.5476,44.5467,44.54667,44.54757,44.5476]},{"x":[-78.02916,-78.02287,-78.02292,-78.02166,-78.02171,-78.01919,-78.01933,-78.02059,-78.02068,-78.01942,-78.01947,-78.01821,-78.01844,-78.01592,-78.01601,-78.01476,-78.01485,-78.01359,-78.01382,-78.01508,-78.01513,-78.01764,-78.01769,-78.02523,-78.025,-78.02752,-78.02743,-78.02869,-78.02873,-78.02999,-78.03008,-78.03511,-78.03516,-78.03642,-78.03651,-78.04028,-78.04033,-78.04158,-78.04154,-78.0428,-78.04284,-78.0441,-78.04414,-78.04289,-78.04298,-78.04424,-78.04428,-78.0468,-78.04675,-78.04927,-78.04931,-78.05183,-78.05187,-78.05439,-78.05443,-78.05569,-78.05574,-78.05699,-78.05704,-78.0583,-78.05834,-78.06463,-78.06468,-78.06845,-78.0684,-78.06966,-78.06971,-78.07348,-78.07352,-78.07478,-78.07483,-78.07608,-78.07604,-78.0773,-78.07739,-78.08116,-78.08111,-78.08363,-78.08358,-78.08484,-78.0848,-78.08857,-78.08862,-78.08736,-78.08745,-78.0887,-78.08879,-78.09131,-78.09135,-78.08884,-78.08888,-78.0914,-78.09153,-78.09531,-78.09526,-78.09778,-78.09782,-78.09908,-78.09912,-78.09787,-78.09791,-78.09665,-78.0967,-78.09544,-78.09557,-78.09809,-78.09813,-78.09436,-78.09441,-78.09315,-78.09319,-78.09194,-78.09198,-78.09072,-78.0909,-78.09216,-78.09225,-78.09477,-78.09472,-78.09598,-78.09602,-78.10231,-78.10235,-78.10361,-78.10343,-78.10595,-78.1059,-78.10716,-78.10711,-78.10837,-78.10828,-78.1108,-78.11084,-78.11461,-78.11475,-78.11852,-78.11865,-78.12242,-78.12233,-78.12611,-78.12615,-78.13369,-78.13374,-78.13499,-78.13504,-78.1363,-78.13634,-78.13885,-78.13894,-78.1402,-78.14024,-78.14276,-78.14289,-78.14415,-78.14419,-78.1467,-78.14675,-78.14801,-78.14805,-78.15433,-78.15438,-78.15815,-78.15819,-78.16196,-78.16201,-78.16704,-78.16708,-78.16582,-78.16591,-78.16717,-78.16725,-78.16851,-78.16855,-78.16981,-78.16985,-78.17111,-78.1712,-78.17371,-78.17376,-78.17501,-78.17497,-78.18,-78.18004,-78.1813,-78.18134,-78.1826,-78.18268,-78.18394,-78.18403,-78.18528,-78.18537,-78.18663,-78.18671,-78.18797,-78.18806,-78.18931,-78.1894,-78.19066,-78.19074,-78.192,-78.19209,-78.19334,-78.19343,-78.19469,-78.19473,-78.19599,-78.19607,-78.19733,-78.19754,-78.1988,-78.19893,-78.20019,-78.20023,-78.19897,-78.19901,-78.20027,-78.2004,-78.20166,-78.20179,-78.20304,-78.20308,-78.20434,-78.20443,-78.21071,-78.21066,-78.21192,-78.21188,-78.2169,-78.21694,-78.21946,-78.21954,-78.22205,-78.2221,-78.22461,-78.22457,-78.22582,-78.22578,-78.22704,-78.22695,-78.22821,-78.22816,-78.22942,-78.22929,-78.22804,-78.22799,-78.22548,-78.22552,-78.22427,-78.22423,-78.22297,-78.22293,-78.22167,-78.2215,-78.22276,-78.22271,-78.22146,-78.22137,-78.21886,-78.21882,-78.21756,-78.21747,-78.21622,-78.21609,-78.21358,-78.21353,-78.21228,-78.21215,-78.21089,-78.21076,-78.20951,-78.20946,-78.20821,-78.20816,-78.20691,-78.20686,-78.20561,-78.20556,-78.20431,-78.20426,-78.20301,-78.20292,-78.20166,-78.20162,-78.20036,-78.20028,-78.19902,-78.19885,-78.19759,-78.19755,-78.19629,-78.19616,-78.19491,-78.19482,-78.19356,-78.19339,-78.19465,-78.19443,-78.19317,-78.19313,-78.19187,-78.19179,-78.19304,-78.193,-78.19174,-78.19166,-78.1904,-78.19036,-78.19161,-78.19157,-78.19031,-78.19027,-78.18901,-78.18906,-78.1878,-78.18776,-78.18524,-78.18528,-78.18403,-78.18407,-78.18281,-78.18286,-78.1816,-78.18156,-78.17778,-78.1777,-78.17518,-78.17523,-78.17397,-78.17393,-78.17141,-78.17145,-78.1702,-78.17011,-78.17388,-78.17379,-78.17631,-78.17627,-78.17752,-78.17748,-78.17999,-78.18004,-78.18255,-78.1826,-78.17882,-78.17887,-78.18641,-78.18637,-78.18763,-78.18758,-78.18632,-78.18624,-78.1875,-78.18737,-78.18988,-78.18984,-78.19235,-78.19231,-78.19482,-78.19478,-78.19604,-78.19608,-78.1986,-78.19855,-78.19981,-78.19977,-78.20228,-78.2022,-78.20345,-78.20341,-78.20593,-78.20584,-78.2071,-78.20714,-78.2084,-78.20827,-78.21204,-78.21191,-78.21317,-78.21304,-78.21178,-78.21183,-78.20931,-78.20936,-78.2081,-78.20814,-78.20562,-78.20567,-78.19938,-78.19942,-78.19691,-78.19695,-78.19443,-78.19452,-78.19326,-78.19331,-78.18953,-78.18958,-78.18832,-78.18823,-78.18698,-78.18689,-78.18563,-78.18559,-78.18433,-78.1842,-78.18294,-78.18285,-78.1816,-78.18164,-78.17787,-78.17782,-78.17657,-78.17661,-78.17535,-78.17531,-78.17279,-78.17275,-78.16898,-78.16902,-78.16776,-78.16781,-78.159,-78.15904,-78.15527,-78.15523,-78.15271,-78.1528,-78.15154,-78.15141,-78.15267,-78.15258,-78.15006,-78.14998,-78.15123,-78.15119,-78.14742,-78.14755,-78.14629,-78.14625,-78.14499,-78.14508,-78.14382,-78.14391,-78.14265,-78.14269,-78.14018,-78.14009,-78.13506,-78.13497,-78.13371,-78.13363,-78.13111,-78.1312,-78.12994,-78.12998,-78.12873,-78.12868,-78.12617,-78.12612,-78.12487,-78.12495,-78.12621,-78.1263,-78.12756,-78.12773,-78.12648,-78.12643,-78.12266,-78.12257,-78.1188,-78.11884,-78.11633,-78.11628,-78.11503,-78.11494,-78.11368,-78.11359,-78.11107,-78.11103,-78.10348,-78.10344,-78.10595,-78.10591,-78.10968,-78.10964,-78.1109,-78.11081,-78.10829,-78.10834,-78.09953,-78.09958,-78.09706,-78.09711,-78.09585,-78.09576,-78.0945,-78.09446,-78.09949,-78.09935,-78.09809,-78.09805,-78.09553,-78.09544,-78.09419,-78.09414,-78.09666,-78.09661,-78.09535,-78.09527,-78.09275,-78.0927,-78.09145,-78.0914,-78.09014,-78.0901,-78.08129,-78.08125,-78.07621,-78.07626,-78.075,-78.07505,-78.07379,-78.07383,-78.07258,-78.07262,-78.07136,-78.07127,-78.07002,-78.06983,-78.07109,-78.07096,-78.0697,-78.06974,-78.06849,-78.06858,-78.06732,-78.06736,-78.06611,-78.06601,-78.06476,-78.06467,-78.06215,-78.0621,-78.05581,-78.05577,-78.04822,-78.04827,-78.04701,-78.04705,-78.04454,-78.04449,-78.04197,-78.04193,-78.03564,-78.03559,-78.03308,-78.03298,-78.02921,-78.02916],"y":[44.59217,44.59201,44.59111,44.59108,44.59018,44.59011,44.58741,44.58745,44.58565,44.58562,44.58472,44.58468,44.58019,44.58012,44.57833,44.57829,44.57649,44.57646,44.57197,44.572,44.5711,44.57117,44.57027,44.57046,44.57496,44.57503,44.57682,44.57686,44.57596,44.57599,44.57419,44.57432,44.57342,44.57346,44.57166,44.57176,44.57086,44.57089,44.57179,44.57182,44.57092,44.57095,44.57006,44.57002,44.56822,44.56826,44.56736,44.56742,44.56832,44.56839,44.56749,44.56755,44.56665,44.56672,44.56582,44.56585,44.56495,44.56499,44.56409,44.56412,44.56322,44.56338,44.56248,44.56258,44.56348,44.56351,44.56261,44.56271,44.56181,44.56184,44.56094,44.56098,44.56187,44.56191,44.56011,44.56021,44.5611,44.56117,44.56207,44.5621,44.563,44.5631,44.5622,44.56216,44.56037,44.5604,44.5586,44.55866,44.55776,44.5577,44.5568,44.55687,44.55417,44.55426,44.55516,44.55523,44.55433,44.55436,44.55346,44.55343,44.55253,44.5525,44.5516,44.55157,44.54887,44.54893,44.54803,44.54794,44.54704,44.54701,44.54611,44.54608,44.54518,44.54515,44.54155,44.54158,44.53978,44.53985,44.54075,44.54078,44.53988,44.54004,44.53914,44.53917,44.54277,44.54283,44.54373,44.54376,44.54466,44.54469,44.54649,44.54656,44.54566,44.54575,44.54305,44.54315,44.54045,44.54055,44.54235,44.54244,44.54154,44.54173,44.54083,44.54086,44.53996,44.54,44.5391,44.53916,44.53736,44.53739,44.53649,44.53656,44.53386,44.53389,44.53299,44.53306,44.53216,44.53219,44.53129,44.53145,44.53055,44.53064,44.52974,44.52983,44.52894,44.52906,44.52816,44.52813,44.52633,44.52636,44.52456,44.5246,44.5237,44.52373,44.52283,44.52286,44.52106,44.52112,44.52022,44.52026,44.52115,44.52128,44.52038,44.52041,44.51951,44.51954,44.51774,44.51778,44.51598,44.51601,44.51421,44.51424,44.51244,44.51247,44.51068,44.51071,44.50891,44.50894,44.50714,44.50717,44.50537,44.5054,44.50361,44.50364,44.50274,44.50277,44.50097,44.501,44.4965,44.49654,44.49384,44.49387,44.49297,44.49294,44.49204,44.49207,44.48937,44.4894,44.48671,44.48674,44.48584,44.48587,44.48407,44.48422,44.48512,44.48515,44.48605,44.48618,44.48528,44.48534,44.48354,44.4836,44.4827,44.48276,44.48366,44.48369,44.48459,44.48462,44.48642,44.48645,44.48735,44.48738,44.49008,44.49005,44.49095,44.49089,44.48999,44.48996,44.49085,44.49082,44.49172,44.49169,44.49529,44.49532,44.49622,44.49619,44.49799,44.49793,44.49883,44.49879,44.50059,44.50056,44.50326,44.5032,44.5041,44.50407,44.50676,44.50673,44.50943,44.5094,44.5103,44.51027,44.51117,44.51114,44.51204,44.51201,44.51291,44.51287,44.51377,44.51374,44.51554,44.51551,44.51641,44.51638,44.51818,44.51815,44.52174,44.52171,44.52261,44.52258,44.52528,44.52525,44.52705,44.52702,44.53061,44.53064,44.53514,44.53511,44.53601,44.53598,44.53777,44.53781,44.5387,44.53867,44.54047,44.54044,44.54134,44.54137,44.54227,44.54224,44.54314,44.54311,44.54221,44.54218,44.54308,44.54301,44.54212,44.54208,44.54119,44.54115,44.54025,44.54022,44.54112,44.54103,44.54283,44.54277,44.54187,44.54184,44.54273,44.54267,44.54177,44.54174,44.54354,44.54363,44.54543,44.54549,44.54639,44.54642,44.54732,44.54739,44.54649,44.54655,44.54565,44.54556,44.54466,44.54484,44.54574,44.54577,44.54667,44.54664,44.54844,44.54847,44.55117,44.55123,44.55213,44.55219,44.55309,44.55315,44.55405,44.55408,44.55318,44.55325,44.55415,44.55418,44.55508,44.55514,44.55694,44.55697,44.55787,44.55793,44.55973,44.55976,44.55886,44.55889,44.56159,44.56168,44.56437,44.56441,44.5671,44.56707,44.56617,44.56611,44.56521,44.56518,44.56428,44.56422,44.56332,44.56317,44.56227,44.56221,44.56131,44.56125,44.55945,44.55942,44.55852,44.55842,44.55753,44.55749,44.55929,44.55926,44.56106,44.56103,44.56193,44.5619,44.56459,44.56456,44.56636,44.56633,44.56543,44.56534,44.56624,44.56621,44.56531,44.56528,44.56618,44.56611,44.56701,44.56692,44.56602,44.56599,44.56509,44.56487,44.56397,44.56388,44.56478,44.56471,44.56292,44.56288,44.56558,44.56561,44.56741,44.56735,44.56915,44.56918,44.57008,44.56998,44.56729,44.56725,44.56815,44.56812,44.56632,44.56629,44.56449,44.56446,44.56356,44.5635,44.5653,44.56517,44.56697,44.56694,44.56874,44.56867,44.56688,44.56684,44.56594,44.56591,44.56681,44.56675,44.56765,44.56762,44.56582,44.56585,44.56405,44.56408,44.56049,44.56046,44.56135,44.56126,44.56306,44.56296,44.56206,44.562,44.5629,44.56287,44.56467,44.56463,44.56643,44.56637,44.56727,44.56708,44.56797,44.56804,44.56894,44.56903,44.56993,44.56996,44.57176,44.5717,44.5708,44.57058,44.56968,44.56961,44.56871,44.56868,44.57048,44.57045,44.57135,44.57148,44.57417,44.57414,44.57504,44.57498,44.57677,44.57674,44.57764,44.57771,44.5786,44.57857,44.58037,44.58031,44.58121,44.58117,44.58207,44.58204,44.58294,44.58271,44.58361,44.58349,44.58259,44.58255,44.58165,44.58162,44.58072,44.58069,44.57979,44.57976,44.58156,44.58153,44.58512,44.58515,44.58785,44.58782,44.58692,44.58689,44.58509,44.58506,44.58416,44.58413,44.58592,44.58589,44.58769,44.58762,44.58852,44.58836,44.58926,44.58907,44.58817,44.58813,44.58724,44.58717,44.58807,44.588,44.5889,44.58874,44.58964,44.58957,44.59137,44.59127,44.59217]},{"x":[-78.06098,-78.06116,-78.05991,-78.05986,-78.0586,-78.05851,-78.05977,-78.05972,-78.06098],"y":[44.58579,44.5822,44.58217,44.58306,44.58303,44.58483,44.58486,44.58576,44.58579]},{"x":[-78.08143,-78.08147,-78.07896,-78.07891,-78.08143],"y":[44.58002,44.57912,44.57905,44.57995,44.58002]},{"x":[-78.03488,-78.03493,-78.03367,-78.03363,-78.03488],"y":[44.57882,44.57792,44.57789,44.57878,44.57882]},{"x":[-78.02482,-78.02487,-78.02361,-78.02356,-78.02482],"y":[44.57856,44.57766,44.57762,44.57852,44.57856]},{"x":[-78.0865,-78.08655,-78.08403,-78.08399,-78.0865],"y":[44.57925,44.57835,44.57828,44.57918,44.57925]},{"x":[-78.03744,-78.03749,-78.03497,-78.03493,-78.03744],"y":[44.57798,44.57708,44.57702,44.57792,44.57798]},{"x":[-78.09284,-78.09288,-78.09163,-78.09158,-78.09284],"y":[44.57851,44.57761,44.57758,44.57848,44.57851]},{"x":[-78.04252,-78.04257,-78.04383,-78.04387,-78.0401,-78.04001,-78.04252],"y":[44.57722,44.57632,44.57635,44.57545,44.57535,44.57715,44.57722]},{"x":[-78.02011,-78.02016,-78.0189,-78.01885,-78.02011],"y":[44.57213,44.57123,44.5712,44.5721,44.57213]},{"x":[-78.07801,-78.07806,-78.0768,-78.07676,-78.07801],"y":[44.57273,44.57183,44.5718,44.5727,44.57273]},{"x":[-78.07932,-78.07936,-78.0781,-78.07806,-78.07932],"y":[44.57186,44.57096,44.57093,44.57183,44.57186]},{"x":[-78.05542,-78.05546,-78.05421,-78.05416,-78.05542],"y":[44.57125,44.57035,44.57032,44.57121,44.57125]},{"x":[-78.14885,-78.14889,-78.14764,-78.14759,-78.14885],"y":[44.56642,44.56552,44.56549,44.56639,44.56642]},{"x":[-78.10366,-78.10375,-78.10124,-78.10119,-78.10245,-78.1024,-78.10366],"y":[44.56348,44.56168,44.56162,44.56252,44.56255,44.56345,44.56348]},{"x":[-78.09495,-78.09504,-78.09378,-78.09382,-78.09257,-78.09252,-78.09126,-78.09122,-78.09248,-78.09243,-78.09495],"y":[44.56146,44.55966,44.55963,44.55873,44.5587,44.5596,44.55956,44.56046,44.56049,44.56139,44.56146]},{"x":[-78.18177,-78.18186,-78.1806,-78.18056,-78.1793,-78.17926,-78.18177],"y":[44.56273,44.56094,44.5609,44.5618,44.56177,44.56267,44.56273]},{"x":[-78.09508,-78.09513,-78.09387,-78.09382,-78.09508],"y":[44.55876,44.55786,44.55783,44.55873,44.55876]},{"x":[-78.10519,-78.10523,-78.10397,-78.10393,-78.10519],"y":[44.55812,44.55722,44.55719,44.55808,44.55812]},{"x":[-78.10267,-78.10272,-78.1002,-78.10016,-78.10267],"y":[44.55805,44.55715,44.55709,44.55799,44.55805]},{"x":[-78.17839,-78.17848,-78.17722,-78.17718,-78.17592,-78.17587,-78.17839],"y":[44.55455,44.55275,44.55272,44.55362,44.55359,44.55449,44.55455]},{"x":[-78.17973,-78.17978,-78.17852,-78.17848,-78.17973],"y":[44.55278,44.55188,44.55185,44.55275,44.55278]},{"x":[-78.17475,-78.17483,-78.17358,-78.17371,-78.17245,-78.17249,-78.17124,-78.17128,-78.17002,-78.16998,-78.16495,-78.16491,-78.16365,-78.1636,-78.16486,-78.16482,-78.16608,-78.16603,-78.17106,-78.17102,-78.17228,-78.17223,-78.17475],"y":[44.55176,44.54996,44.54993,44.54723,44.5472,44.5463,44.54627,44.54537,44.54534,44.54624,44.54611,44.54701,44.54698,44.54788,44.54791,44.54881,44.54884,44.54974,44.54987,44.55077,44.5508,44.5517,44.55176]},{"x":[-78.13963,-78.13967,-78.14093,-78.14097,-78.13846,-78.13841,-78.13716,-78.13711,-78.13963],"y":[44.54908,44.54818,44.54821,44.54732,44.54725,44.54815,44.54812,44.54902,44.54908]},{"x":[-78.18116,-78.18121,-78.17995,-78.17991,-78.18116],"y":[44.54922,44.54832,44.54829,44.54918,44.54922]},{"x":[-78.15224,-78.15229,-78.15103,-78.15099,-78.15224],"y":[44.5485,44.5476,44.54757,44.54847,44.5485]},{"x":[-78.15355,-78.15359,-78.15485,-78.15489,-78.15615,-78.15619,-78.15368,-78.15372,-78.15246,-78.15251,-78.15125,-78.15107,-78.15233,-78.15229,-78.15355],"y":[44.54763,44.54673,44.54676,44.54586,44.54589,44.545,44.54493,44.54403,44.544,44.5431,44.54307,44.54667,44.5467,44.5476,44.54763]},{"x":[-78.14488,-78.14492,-78.14366,-78.14362,-78.14488],"y":[44.54471,44.54381,44.54378,44.54468,44.54471]},{"x":[-78.09459,-78.09463,-78.09337,-78.09333,-78.09459],"y":[44.54344,44.54254,44.54251,44.54341,44.54344]},{"x":[-78.16018,-78.16023,-78.15897,-78.15893,-78.16018],"y":[44.54059,44.53969,44.53966,44.54056,44.54059]},{"x":[-78.15264,-78.15268,-78.15143,-78.15138,-78.15264],"y":[44.54041,44.53951,44.53947,44.54037,44.54041]},{"x":[-78.1904,-78.19044,-78.18919,-78.18914,-78.1904],"y":[44.54044,44.53954,44.53951,44.54041,44.54044]},{"x":[-78.16161,-78.1617,-78.15919,-78.1591,-78.16161],"y":[44.53703,44.53523,44.53517,44.53697,44.53703]},{"x":[-78.18056,-78.18065,-78.17939,-78.1793,-78.18056],"y":[44.5357,44.5339,44.53387,44.53567,44.5357]},{"x":[-78.18442,-78.1845,-78.18325,-78.1832,-78.18195,-78.1819,-78.18442],"y":[44.53399,44.53219,44.53216,44.53306,44.53303,44.53393,44.53399]},{"x":[-78.16682,-78.16686,-78.1656,-78.16556,-78.16682],"y":[44.53356,44.53266,44.53263,44.53352,44.53356]}],"scale_km":2},"extent":{"animal":[-78.169323,44.53168,-78.156497,44.566747],"open":"animal"}}</script>
+<script id="detqc-card">
+var D = JSON.parse(document.getElementById("detqc-data").textContent);
+
+/* ================= constants ================================================= */
+var COL = {
+  alive:"#2c7fb8", review:"#d95f02", dead:"#c2202a", dead_or_shed:"#c2202a",
+  det:"#404040", depLine:"#1d4f60", depBand:"#7fcdbb", accLine:"#8c2d04", accBand:"#fdae6b",
+  step:"#5b2c8d", flag:"#c2202a", horizon:"#595959", expiry:"#b9840c",
+  cursor:"#111111", win:"rgba(240,165,0,0.20)", winEdge:"rgba(200,130,0,0.65)",
+  grid:"#ececec", axis:"#555", mute:"#8a8a8a", note:"#5b2c8d"
+};
+var DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+var MS_DAY = 86400000;
+var T0 = Date.parse(D.t0 + "T00:00:00Z");
+function dayStr(i){ return new Date(T0 + i*MS_DAY).toISOString().slice(0,10); }
+function dayIdx(s){ return Math.round((Date.parse(s + "T00:00:00Z") - T0)/MS_DAY); }
+function esc(s){ return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;")
+  .replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function fmtN(x){ return (x==null||!isFinite(x)) ? "n/a" : String(Math.round(x)).replace(/\B(?=(\d{3})+(?!\d))/g,","); }
+function fmt1(x){ return (x==null||!isFinite(x)) ? "n/a" : x.toFixed(1); }
+function fmt2(x){ return (x==null||!isFinite(x)) ? "n/a" : x.toFixed(2); }
+function plural(n, w){ return n === 1 ? w : w + "s"; }
+
+/* last is null, not 0, when no frame has run: a check of `!S.last` cannot tell
+   an unset clock from a timestamp of zero, and stalls the loop when it sees one. */
+var S = { i: 0, win: 7, speed: 5, playing: false, whole: false, last: null, iOpen: null, touched: false };
+
+/* ================= header ================================================== */
+function voteClass(v){ return v === "dead" ? "vote-dead" : (v === "alive" ? "vote-alive" : (v === "review" ? "vote-review" : "")); }
+(function header(){
+  var a = D.animal, b = D.band;
+  document.getElementById("h1").textContent = a.id + (a.species ? "  (" + a.species + ")" : "");
+  document.getElementById("sub").textContent =
+    "Mortality review card. The band is a triage from the rule streams; your call below is the verdict. " +
+    "Every number on this card is read from the detset it was built from (" + D.source + ").";
+  var flag = b.death_date
+    ? ("candidate death date <b>" + b.death_date + (b.death_time ? " " + b.death_time.slice(11, 19) + " UTC" : "") +
+       "</b>" + (b.basis ? " (" + esc(b.basis) + ")" : ""))
+    : "<b>no candidate death date</b>";
+  var rank = b.rank ? ' &nbsp;|&nbsp; persistence rank <b>' + b.rank + ' of ' + b.of + '</b> in the review band (score ' +
+    fmt2(b.persistence) + ')' : '';
+  var life = a.tag_life_days != null
+    ? ("nominal tag life " + fmtN(a.tag_life_days) + plural(a.tag_life_days, " day") + (a.expiry ? ", expiry " + a.expiry : ""))
+    : "tag life not recorded";
+  var end = "last detection <b>" + a.last + "</b>, " + fmtN(a.to_horizon) + plural(a.to_horizon, " day") +
+    " before the last detection in the detset (" + D.marks.horizon_date + ")";
+  if (a.to_expiry != null) end += a.to_expiry >= 0
+    ? "; " + fmtN(a.to_expiry) + plural(a.to_expiry, " day") + " before the nominal tag expiry"
+    : "; " + fmtN(-a.to_expiry) + plural(-a.to_expiry, " day") + " after the nominal tag expiry";
+  /* The vote table is folded under the header, with its counts in the summary,
+     so the call bar loads in view at 1500 x 1000. */
+  var tally = {}; D.votes.forEach(function(v){ tally[v.vote] = (tally[v.vote] || 0) + 1; });
+  var tallyText = ["dead", "review", "alive"].filter(function(k){ return tally[k]; })
+    .map(function(k){ return tally[k] + " " + k; }).join(", ");
+  var votes = D.votes.length ? '<details class="votesbox"><summary>votes of the ' + D.votes.length + ' rule streams' +
+    (tallyText ? ': ' + tallyText : ': no dead, review or alive vote') + ' (open for each stream, its date and basis)</summary>' +
+    '<table class="votes"><tr><th>rule stream</th><th>vote</th><th>date</th><th>basis</th></tr>' +
+    D.votes.map(function(v){
+      return '<tr><td>' + esc(v.label) + '</td><td class="' + voteClass(v.vote) + '">' + esc(v.vote) + '</td><td>' +
+        esc(v.date || "") + '</td><td>' + esc(v.detail || "") + '</td></tr>';
+    }).join("") + '</table></details>' : '<div class="row">no rule stream voted on this animal</div>';
+  document.getElementById("facts").innerHTML =
+    '<div class="l1">' + esc(a.id) + '</div>' +
+    '<div class="row"><span class="pill ' + b.band + '">' + b.band.toUpperCase() + '</span> &nbsp; ' +
+      'decided by <b>' + esc(b.rule_label) + '</b> &nbsp;|&nbsp; ' + flag + rank + '</div>' +
+    '<div class="row">species <b>' + esc(a.species || "not recorded") + '</b> &nbsp;|&nbsp; ' +
+      (a.size ? '<b>' + esc(a.size) + '</b>' : 'size not recorded') + ' &nbsp;|&nbsp; tag <b>' + esc(a.tag_model || "model not recorded") +
+      '</b> &nbsp;|&nbsp; ' + plural(a.transmitters.length, "transmitter") + ' <b>' + esc(a.transmitters.join(", ")) +
+      '</b> &nbsp;|&nbsp; sensors <b>' + esc(a.sensors) + '</b> &nbsp;|&nbsp; ' + life + '</div>' +
+    '<div class="row">' + (a.release ? 'released <b>' + a.release + '</b> &nbsp;|&nbsp; ' : 'release not recorded &nbsp;|&nbsp; ') +
+      'record <b>' + a.first + '</b> to <b>' + a.last + '</b> &nbsp;|&nbsp; ' +
+      fmtN(a.detection_days) + plural(a.detection_days, " detection day") + ' in a ' + fmtN(a.span_days) +
+      '-day calendar span &nbsp;|&nbsp; ' + fmtN(a.detections) + plural(a.detections, " detection") + ' at ' +
+      fmtN(a.stations) + plural(a.stations, " station") + '</div>' +
+    '<div class="row">' + end + '</div>' + votes;
+  document.getElementById("maptitle").textContent =
+    "Where it was heard in the trailing window. The rings that heard it are sized by located " +
+    "detections; its daily positions are centroids, the detection-weighted mean station position. " +
+    "The smallest rings are all " + D.stations.length + plural(D.stations.length, " station position") + " of " +
+    D.sids.length + plural(D.sids.length, " station") + " (a station whose deployments moved has several).";
+  document.getElementById("caption").innerHTML =
+    "Daily bins, " + D.nd + " UTC days from " + D.t0 + " to " + dayStr(D.nd-1) + ". " +
+    (D.marks.release_before ? "The axis starts at the first day of the detset (" + D.marks.data_start +
+      "); the animal was released before it, on " + esc(D.animal.release) + ", and the days between hold no data. " : "") +
+    "Station panel: one row per station (station_id) that heard the animal, at the mean latitude of its deployments, north at the top; " +
+    "each cell's fill counts the detections at that station that day, on the log scale of the key. " +
+    "Apparent movement is the distance between the daily centroids of consecutive detection days. " +
+    "Sensor panels show the daily median with the 5th to 95th percentile band, from calibrated readings. " +
+    "The last detection in the detset is on " + D.marks.horizon_date + ". " +
+    "Denominators: detection days count UTC days with at least one detection; window counts cover the trailing window only.";
+})();
+
+/* ================= geometry ================================================ */
+/* The map is small enough that the station and detection panels load in
+   view at 1500 x 1000 under the call bar. */
+var MAPW = 460, MAPH = 260;
+/* The third sensor panel shows acceleration, or the sensor the tag carries. */
+var ACC_TITLE = D.has.accel ? "acceleration, daily median and 5th to 95th percentile (m/s2)"
+  : (D.has.other ? D.has.other + ", daily median and 5th to 95th percentile (" + (D.has.other_unit || "unit not recorded") + ")"
+  : "acceleration (m/s2)");
+/* The readout names the third panel's sensor in the same words and unit. */
+var ACC_NAME = D.has.accel ? "acceleration" : (D.has.other || "acceleration");
+var ACC_UNIT = D.has.accel || !D.has.other ? "m/s2" : (D.has.other_unit || "unit not recorded");
+var NH = D.heard.length;
+/* The station panel grows with its rows, at least 4 px each, so 72 stations
+   do not share 170 px. */
+var PANEL = [
+  {key:"stn",  h:Math.max(36, Math.min(NH*9, Math.max(170, NH*4))),
+   title:"detections per day by station: " + NH + plural(NH, " station") + " that heard it", short:"detections/day, " + NH + plural(NH, " station")},
+  {key:"det",  h:64, title:"detections per day, all stations (log scale)", short:"detections/day (log)"},
+  {key:"pos",  h:64, title:"apparent movement: km between daily centroids of consecutive detection days", short:"km between daily centroids"},
+  {key:"dep",  h:64, title:"depth, daily median and 5th to 95th percentile (m)", short:"depth (m), median, 5th-95th"},
+  {key:"acc",  h:64, title:ACC_TITLE, short:ACC_NAME + " (" + ACC_UNIT + "), median, 5th-95th"},
+  {key:"lane", h:Math.max(30, 15*D.streams.length + 8), title:"rule streams: vote and the date it points to", short:"rule stream votes"},
+  {key:"note", h:30, title:"my notes and my death date", short:"notes, death date"}
+];
+/* A title that does not fit the panel's width at 10 px takes its short form,
+   and is cut with an ellipsis only when that does not fit either. */
+function fitTitle(g, p, w){
+  var t = p.title;
+  if (g.measureText(t).width <= w) return t;
+  t = p.short || t;
+  while (t.length > 4 && g.measureText(t).width > w) t = t.slice(0, -2);
+  return t === (p.short || p.title) ? t : t + "...";
+}
+/* Vertical marks run through the panel bodies only, so no line crosses a
+   panel title. */
+function panelSpans(){
+  return PANEL.map(function(p){ var t = panelTop(p.key); return [t, t + p.h]; });
+}
+function vlineBodies(g, x){
+  g.beginPath();
+  panelSpans().forEach(function(sp){ g.moveTo(x, sp[0]); g.lineTo(x, sp[1]); });
+  g.stroke();
+}
+function panelH(k){ for (var j=0;j<PANEL.length;j++) if (PANEL[j].key===k) return PANEL[j].h; return 0; }
+var PADL = 76, PADR = 12, PADT = 16, AXISH = 24, GAP = 7, TOPPAD = 11;
+var STACKH = TOPPAD + PANEL.reduce(function(a,p){return a+p.h+PADT+GAP;},0) + AXISH;
+var stackW = 900;
+
+var mapC = document.getElementById("map"), mapX = mapC.getContext("2d");
+var stC  = document.getElementById("stack"), stX = stC.getContext("2d");
+var mapBg = document.createElement("canvas"), mapBgX = mapBg.getContext("2d");
+var stBg  = document.createElement("canvas"), stBgX  = stBg.getContext("2d");
+
+function setCanvas(c, x, w, h){
+  c.width = w*DPR; c.height = h*DPR; c.style.width = w+"px"; c.style.height = h+"px";
+  x.setTransform(DPR,0,0,DPR,0,0);
+}
+function xOf(i){ return PADL + (stackW-PADL-PADR) * (D.nd<=1 ? 0.5 : i/(D.nd-1)); }
+function iOfX(px){
+  if (D.nd<=1) return 0;
+  var f = (px-PADL)/(stackW-PADL-PADR);
+  return Math.max(0, Math.min(D.nd-1, Math.round(f*(D.nd-1))));
+}
+function panelTop(k){
+  var y = TOPPAD;
+  for (var j=0;j<PANEL.length;j++){ if (PANEL[j].key===k) return y+PADT; y += PANEL[j].h+PADT+GAP; }
+  return y;
+}
+
+/* The map opens on the animal's stations when they fill under a quarter of the
+   array (D.extent.open), and the button switches between the two extents. */
+var EXT = D.extent || {animal: D.lake.bbox, open: "whole"};
+var BB, midlat, kx, sc, ox, oy, mpad = 10, SCALE_KM = D.lake.scale_km;
+function setExtent(which){
+  EXT.now = which;
+  BB = which === "animal" ? EXT.animal : D.lake.bbox;
+  midlat = (BB[1]+BB[3])/2; kx = Math.cos(midlat*Math.PI/180);
+  sc = Math.min((MAPW-2*mpad)/Math.max(1e-9,(BB[2]-BB[0])*kx), (MAPH-2*mpad)/Math.max(1e-9,BB[3]-BB[1]));
+  ox = (MAPW - (BB[2]-BB[0])*kx*sc)/2; oy = (MAPH - (BB[3]-BB[1])*sc)/2;
+  var widthKm = (BB[2]-BB[0])*kx*111.32, nice = [0.1,0.2,0.5,1,2,5,10,20,50,100,200,500];
+  SCALE_KM = nice[0];
+  nice.forEach(function(v){ if (v <= widthKm/5) SCALE_KM = v; });
+  var b = document.getElementById("extentbtn");
+  if (b) b.textContent = which === "animal" ? "show the whole array" : "zoom to this animal's stations";
+}
+setExtent(EXT.open);
+function mx(lon){ return ox + (lon-BB[0])*kx*sc; }
+function my(lat){ return MAPH - oy - (lat-BB[1])*sc; }
+
+/* ================= static layers =========================================== */
+/* A receiver as the positionR packages draw one: a yellow ring over a dark
+   ring one step wider, never filled. */
+var RING = { yellow:"#FDE725", dark:"#1A1A1A" }, POS = { fill:"#2ECC40", edge:"#000000" };
+function receiverRing(g, x, y, r){
+  g.beginPath(); g.arc(x, y, r, 0, 6.2832);
+  g.strokeStyle = RING.dark; g.lineWidth = 3.4; g.stroke();
+  g.strokeStyle = RING.yellow; g.lineWidth = 1.5; g.stroke();
+}
+function positionPoint(g, x, y, r){
+  g.beginPath(); g.arc(x, y, r, 0, 6.2832);
+  g.fillStyle = POS.fill; g.fill();
+  g.strokeStyle = POS.edge; g.lineWidth = 0.9; g.stroke();
+}
+
+/* The keys to the map and the panels, drawn with the colours and dashes the
+   canvases use, so that the captions need name no colour. A mark the card
+   does not draw is left out of its key. */
+function svgKey(inner, w){
+  return '<svg width="' + (w || 18) + '" height="14" viewBox="0 0 ' + (w || 18) + ' 14">' + inner + '</svg>';
+}
+function keyItem(svg, label){ return '<span>' + svg + esc(label) + '</span>'; }
+function ringSvg(r){
+  return svgKey('<circle cx="9" cy="7" r="' + r + '" fill="none" stroke="' + RING.dark + '" stroke-width="3.4"/>' +
+                '<circle cx="9" cy="7" r="' + r + '" fill="none" stroke="' + RING.yellow + '" stroke-width="1.5"/>');
+}
+function pointSvg(r){
+  return svgKey('<circle cx="9" cy="7" r="' + r + '" fill="' + POS.fill + '" stroke="' + POS.edge + '" stroke-width="0.9"/>');
+}
+function vlineSvg(col, dash, w){
+  return svgKey('<line x1="9" y1="0" x2="9" y2="14" stroke="' + col + '" stroke-width="' + w + '"' +
+                (dash ? ' stroke-dasharray="' + dash + '"' : '') + '/>');
+}
+function drawKeys(){
+  document.getElementById("mapkey").innerHTML =
+    keyItem(ringSvg(5), "heard it") +
+    keyItem(ringSvg(2.5), "station position") +
+    keyItem(pointSvg(2.2), "daily position") +
+    keyItem(pointSvg(4.2), "cursor day") +
+    keyItem(svgKey('<line x1="1" y1="11" x2="17" y2="3" stroke="rgba(60,60,60,0.8)" stroke-width="1.4"/>'),
+            "path, fading with age");
+  var vmax = 1, k, ramp = "";
+  for (k=2;k<D.dss.length;k+=3) if (D.dss[k] > vmax) vmax = D.dss[k];
+  for (k=0;k<5;k++){
+    ramp += '<rect x="' + (k*8) + '" y="2" width="8" height="10" fill="rgba(37,52,148,' +
+            (0.22 + 0.78*k/4).toFixed(3) + ')"/>';
+  }
+  var items = [keyItem(svgKey(ramp, 40), "detections per station and day, 1 to " + fmtN(vmax) + " (log scale)")];
+  if (D.marks.flag != null){
+    items.push(keyItem(vlineSvg(COL.flag, "", 1.4), "candidate death date"));
+    items.push(keyItem(svgKey('<rect x="1" y="1" width="16" height="12" fill="rgba(194,32,42,0.07)" stroke="#dcdcdc"/>'),
+                       "days after the candidate date"));
+  }
+  items.push(keyItem(vlineSvg(COL.horizon, "5,3", 1), "last detection in the detset"));
+  if (D.marks.expiry != null) items.push(keyItem(vlineSvg(COL.expiry, "2,3", 1.2), "nominal tag expiry"));
+  items.push(keyItem(vlineSvg(COL.cursor, "", 1.3), "cursor day"));
+  items.push(keyItem(svgKey('<rect x="1" y="1" width="16" height="12" fill="' + COL.win + '"/>' +
+                            '<line x1="1.5" y1="1" x2="1.5" y2="13" stroke="' + COL.winEdge + '"/>'), "trailing window"));
+  items.push(keyItem(vlineSvg("#0a7d33", "6,3", 1.6), "my death date"));
+  document.getElementById("stackkey").innerHTML = items.join("");
+}
+drawKeys();
+
+function drawMapBg(){
+  setCanvas(mapBg, mapBgX, MAPW, MAPH);
+  mapBgX.fillStyle="#fff"; mapBgX.fillRect(0,0,MAPW,MAPH);
+  mapBgX.fillStyle="#f2f6f8"; mapBgX.strokeStyle="#c3ced4"; mapBgX.lineWidth=0.7;
+  D.lake.rings.forEach(function(r){
+    mapBgX.beginPath();
+    for (var i=0;i<r.x.length;i++){
+      var px=mx(r.x[i]), py=my(r.y[i]);
+      if(i===0) mapBgX.moveTo(px,py); else mapBgX.lineTo(px,py);
+    }
+    mapBgX.closePath(); mapBgX.fill(); mapBgX.stroke();
+  });
+  /* every station, as the smallest receiver ring: the map has to say where
+     listening was possible */
+  D.stations.forEach(function(s){ receiverRing(mapBgX, mx(s.lon), my(s.lat), 2.5); });
+  var km = SCALE_KM, len = km*1000/111320*sc;
+  var bx = 14, by = MAPH-16;
+  mapBgX.strokeStyle="#333"; mapBgX.lineWidth=1.4;
+  mapBgX.beginPath(); mapBgX.moveTo(bx,by); mapBgX.lineTo(bx+len,by); mapBgX.stroke();
+  mapBgX.fillStyle="#333"; mapBgX.font="10px -apple-system,Helvetica,Arial";
+  mapBgX.textAlign="center"; mapBgX.fillText(km + " km", bx+len/2, by-4);
+  mapBgX.textAlign="left";
+}
+
+function yScaleLog(v, top, h, vmax){
+  var hi = Math.log10(Math.max(10, vmax));
+  var t = v<=0 ? 0 : Math.log10(v)/hi;
+  return top + h - t*h;
+}
+
+function drawStackBg(){
+  setCanvas(stBg, stBgX, stackW, STACKH);
+  var g = stBgX;
+  PLACEHOLDERS = [];
+  g.fillStyle="#fff"; g.fillRect(0,0,stackW,STACKH);
+  g.font="10px -apple-system,Helvetica,Arial";
+  var flagI = D.marks.flag;
+  PANEL.forEach(function(p){
+    var top = panelTop(p.key), h = p.h;
+    g.fillStyle="#333"; g.textAlign="left"; g.font="bold 10px -apple-system,Helvetica,Arial";
+    g.fillText(fitTitle(g, p, stackW-PADL-PADR), PADL, top-3);
+    g.font="10px -apple-system,Helvetica,Arial";
+    g.strokeStyle="#dcdcdc"; g.lineWidth=1;
+    g.strokeRect(PADL, top, stackW-PADL-PADR, h);
+    if (flagI != null){
+      g.fillStyle="rgba(194,32,42,0.07)";
+      g.fillRect(xOf(flagI), top, xOf(D.nd-1)-xOf(flagI), h);
+    }
+  });
+  drawStations(g); drawDetections(g); drawSteps(g);
+  var raw = D.has.raw_readings ? "; " + fmtN(D.has.raw_readings) + plural(D.has.raw_readings, " raw reading") +
+    " (" + D.has.raw_classes + ") with no calibration" : "";
+  series(g, panelTop("dep"), panelH("dep"), D.series.dep, D.series.depLo, D.series.depHi,
+         COL.depLine, COL.depBand, true, D.has.depth ? null : "no calibrated depth readings for this animal" + raw);
+  series(g, panelTop("acc"), panelH("acc"), D.series.acc, D.series.accLo, D.series.accHi,
+         COL.accLine, COL.accBand, false, (D.has.accel || D.has.other) ? null : "no calibrated acceleration readings for this animal" + raw);
+  drawLanes(g); drawMarks(g); drawAxis(g);
+}
+
+/* One row per station (station_id) that heard the animal, north at the top;
+   the shade of a cell is the day's detections there on a log scale. A station
+   whose deployments moved keeps one row, so a dead tag stays on one line. */
+function drawStations(g){
+  var top=panelTop("stn"), h=panelH("stn"), n=D.heard.length, k;
+  if (!n){
+    g.fillStyle=COL.mute; g.textAlign="center";
+    g.fillText("no detection with a station", PADL+(stackW-PADL-PADR)/2, top+h/2+3);
+    g.textAlign="left"; return;
+  }
+  var row = {}; D.heard.forEach(function(si, r){ row[si] = r; });
+  var rh = h/n, vmax = 1;
+  for (k=2;k<D.dss.length;k+=3) if (D.dss[k] > vmax) vmax = D.dss[k];
+  var w = Math.max(1.5, (stackW-PADL-PADR)/Math.max(1, D.nd));
+  for (k=0;k<D.dss.length;k+=3){
+    var r = row[D.dss[k+1]]; if (r == null) continue;
+    var t = Math.log(1 + D.dss[k+2])/Math.log(1 + vmax);
+    g.fillStyle = "rgba(37,52,148," + (0.22 + 0.78*t).toFixed(3) + ")";
+    /* Each day's cell is clipped to the panel, so the first day does not
+       cover the station names and the last does not pass the frame. */
+    var x0 = Math.max(PADL, xOf(D.dss[k]) - w/2), x1 = Math.min(stackW - PADR, xOf(D.dss[k]) + w/2);
+    g.fillRect(x0, top + r*rh + (rh > 4 ? 0.5 : 0), Math.max(1, x1 - x0), Math.max(1, rh - (rh > 4 ? 1 : 0)));
+  }
+  /* Every row is labelled when rows are 9 px or more; otherwise every k-th. */
+  g.fillStyle=COL.axis; g.textAlign="right"; g.font="9px -apple-system,Helvetica,Arial";
+  var every = Math.max(1, Math.ceil(9/rh));
+  D.heard.forEach(function(si, r){
+    if (r % every !== 0) return;
+    g.fillText(fitStation(g, String(D.sids[si]), PADL-8), PADL-4, top + (r+0.5)*rh + 3);
+  });
+  g.textAlign="left"; g.font="10px -apple-system,Helvetica,Arial";
+}
+
+/* A long station name keeps its end, which tells stations apart: OTN names
+   such as a station 1 and a station 10 of one project share their start. */
+function fitStation(g, id, w){
+  if (g.measureText(id).width <= w) return id;
+  var t = id;
+  while (t.length > 2 && g.measureText("\u2026" + t).width > w) t = t.slice(1);
+  return "\u2026" + t;
+}
+
+/* Day bars of the detections panel. A day with one detection sits at the
+   bottom of the log scale, so every bar is at least 3 px tall, and a bar is
+   up to 6 px wide on a short record. drawStack() draws the bars again over
+   the candidate line and the cursor, so no day is hidden under them. */
+function drawDetBars(g){
+  var top=panelTop("det"), h=panelH("det"), vmax = D.dmax;
+  var dayPx = D.nd<=1 ? 6 : (stackW-PADL-PADR)/(D.nd-1);
+  var w = Math.max(1, Math.min(6, Math.floor(0.6*dayPx)));
+  g.fillStyle=COL.det;
+  for (var i=0;i<D.nd;i++){
+    var v=D.series.dets[i]; if(!v) continue;
+    var x=Math.round(xOf(i) - w/2);
+    var y=Math.min(yScaleLog(v, top, h, vmax), top+h-3);
+    g.fillRect(x, y, w, top+h-y);
+  }
+}
+
+function drawDetections(g){
+  var top=panelTop("det"), h=panelH("det"), vmax = D.dmax;
+  drawDetBars(g);
+  g.fillStyle=COL.axis; g.textAlign="right";
+  [1,10,100,1000,10000].forEach(function(v){
+    if (v>Math.max(10,vmax)) return;
+    var y=yScaleLog(v, top, h, vmax);
+    g.strokeStyle=COL.grid; g.beginPath(); g.moveTo(PADL,y); g.lineTo(stackW-PADR,y); g.stroke();
+    g.fillText(fmtN(v), PADL-4, y+3);
+  });
+  g.textAlign="left";
+}
+
+function drawSteps(g){
+  var top=panelTop("pos"), h=panelH("pos"), st=D.series.step, vmax=0.5;
+  for (var i=0;i<D.nd;i++) if (st[i]!=null && st[i]>vmax) vmax=st[i];
+  function yv(v){ return top + h - (v/vmax)*h*0.92; }
+  g.fillStyle=COL.axis; g.textAlign="right";
+  [0, vmax/2, vmax].forEach(function(v){
+    var y=yv(v);
+    g.strokeStyle=COL.grid; g.beginPath(); g.moveTo(PADL,y); g.lineTo(stackW-PADR,y); g.stroke();
+    g.fillText(fmt1(v), PADL-4, y+3);
+  });
+  g.textAlign="left"; g.fillStyle=COL.step;
+  for (var j=0;j<D.nd;j++){
+    if (st[j]==null) continue;
+    g.beginPath(); g.arc(xOf(j), yv(st[j]), 1.5, 0, 6.2832); g.fill();
+  }
+}
+
+/* The text of an empty panel, kept so that drawStack() can draw it again
+   over the window, the cursor and the death lines. */
+var PLACEHOLDERS = [];
+function drawPlaceholder(g, ph){
+  g.font="10px -apple-system,Helvetica,Arial"; g.textAlign="center";
+  var w = g.measureText(ph.text).width + 10;
+  g.fillStyle="#f7f7f7"; g.fillRect(ph.x - w/2, ph.y - 11, w, 15);
+  g.fillStyle=COL.mute; g.fillText(ph.text, ph.x, ph.y);
+  g.textAlign="left";
+}
+function series(g, top, h, med, lo, hi, colLine, colBand, rev, absent){
+  if (absent){
+    g.fillStyle="#f7f7f7"; g.fillRect(PADL+1, top+1, stackW-PADL-PADR-2, h-2);
+    var ph = { text: absent, x: PADL+(stackW-PADL-PADR)/2, y: top+h/2+3 };
+    PLACEHOLDERS.push(ph); drawPlaceholder(g, ph); return;
+  }
+  var vmin=Infinity, vmax=-Infinity, i;
+  for (i=0;i<D.nd;i++){ if (lo[i]!=null){ if(lo[i]<vmin) vmin=lo[i]; if(hi[i]>vmax) vmax=hi[i]; } }
+  if (!isFinite(vmin)) { vmin=0; vmax=1; }
+  if (vmax===vmin) vmax = vmin+1;
+  var pad=(vmax-vmin)*0.05; vmin-=pad; vmax+=pad;
+  function yv(v){ var t=(v-vmin)/(vmax-vmin); return rev ? top+t*h : top+h-t*h; }
+  g.fillStyle=colBand; g.globalAlpha=0.62;
+  var run=[];
+  function flush(){
+    if (run.length<1) { run=[]; return; }
+    g.beginPath(); g.moveTo(xOf(run[0]), yv(lo[run[0]]));
+    run.forEach(function(k){ g.lineTo(xOf(k), yv(lo[k])); });
+    for (var j=run.length-1;j>=0;j--) g.lineTo(xOf(run[j]), yv(hi[run[j]]));
+    g.closePath(); g.fill(); run=[];
+  }
+  for (i=0;i<D.nd;i++){ if (med[i]!=null) run.push(i); else flush(); }
+  flush();
+  g.globalAlpha=1;
+  g.strokeStyle=colLine; g.lineWidth=0.9; g.beginPath();
+  var pen=false;
+  for (i=0;i<D.nd;i++){
+    if (med[i]==null){ pen=false; continue; }
+    if(!pen){ g.moveTo(xOf(i),yv(med[i])); pen=true; } else g.lineTo(xOf(i),yv(med[i]));
+  }
+  g.stroke();
+  g.fillStyle=COL.axis; g.textAlign="right";
+  [vmin, (vmin+vmax)/2, vmax].forEach(function(v){ g.fillText(fmt2(v), PADL-4, yv(v)+3); });
+  g.textAlign="left";
+}
+
+function drawLanes(g){
+  var top=panelTop("lane"), h=panelH("lane"), n=D.streams.length, lh=h/Math.max(1,n);
+  D.streams.forEach(function(s,k){
+    var y = top + lh*(k+0.5);
+    g.strokeStyle="#ededed"; g.lineWidth=lh*0.62;
+    g.beginPath(); g.moveTo(PADL,y); g.lineTo(stackW-PADR,y); g.stroke();
+    g.fillStyle="#444"; g.textAlign="right"; g.font="9.5px -apple-system,Helvetica,Arial";
+    g.fillText(s.label, PADL-4, y+3);
+    /* The state sits at the right end of the lane; on the left it would cover
+       the marker of a stream that fired early in the record. */
+    g.fillStyle = s.vote==="dead" ? COL.dead : (s.vote==="alive" ? COL.alive : (s.vote==="review" ? COL.review : COL.mute));
+    g.fillText("[" + s.state + "]", stackW-PADR-4, y+3);
+    g.textAlign="left";
+    if (s.day != null){
+      var x=xOf(s.day);
+      g.fillStyle = s.vote==="dead" ? COL.dead : (s.vote==="alive" ? COL.alive : COL.review);
+      g.beginPath(); g.moveTo(x, y-5.5); g.lineTo(x+5, y+4); g.lineTo(x-5, y+4); g.closePath(); g.fill();
+    }
+  });
+  g.font="10px -apple-system,Helvetica,Arial";
+}
+
+function drawMarks(g){
+  var yTop = panelTop(PANEL[0].key), yBot = panelTop("note")+panelH("note");
+  function vline(i, col, dash, w){
+    if (i==null || i<0 || i>=D.nd) return;
+    g.save(); g.setLineDash(dash); g.strokeStyle=col; g.lineWidth=w;
+    var x=Math.round(xOf(i))+0.5;
+    vlineBodies(g, x); g.restore();
+  }
+  vline(D.marks.expiry, COL.expiry, [2,3], 1.2);
+  vline(D.marks.horizon, COL.horizon, [5,3], 1);
+  vline(D.marks.flag, COL.flag, [], 1.4);
+  /* A release before the axis is an arrow at its left edge. */
+  if (D.marks.release_before){
+    g.fillStyle = COL.axis; g.font = "10px -apple-system,Helvetica,Arial"; g.textAlign = "left";
+    g.fillText("\u2190 released " + D.animal.release, PADL + 3, yTop - 4 - 12);
+  }
+}
+
+function drawAxis(g){
+  var y = STACKH - AXISH + 2;
+  g.strokeStyle="#999"; g.lineWidth=1;
+  g.beginPath(); g.moveTo(PADL,y); g.lineTo(stackW-PADR,y); g.stroke();
+  g.fillStyle=COL.axis; g.textAlign="center"; g.font="10px -apple-system,Helvetica,Arial";
+  var stepMo = D.nd > 900 ? 6 : (D.nd > 400 ? 3 : (D.nd > 150 ? 2 : 1));
+  var d0=new Date(T0), yy=d0.getUTCFullYear(), mm=d0.getUTCMonth();
+  for (var k=0;k<200;k++){
+    var i=Math.round((Date.UTC(yy, mm+k*stepMo, 1)-T0)/MS_DAY);
+    if (i<0) continue; if (i>D.nd-1) break;
+    var x=xOf(i);
+    g.strokeStyle="#999"; g.beginPath(); g.moveTo(x,y); g.lineTo(x,y+4); g.stroke();
+    g.fillText(dayStr(i).slice(0,7), x, y+15);
+  }
+  g.textAlign="left";
+}
+
+/* ================= dynamic layers ========================================== */
+function winRange(){
+  if (S.whole) return [0, D.nd-1];
+  return [Math.max(0, S.i - S.win + 1), S.i];
+}
+
+function drawStack(){
+  stX.clearRect(0,0,stackW,STACKH);
+  stX.drawImage(stBg, 0,0, stackW, STACKH);
+  var yTop = panelTop(PANEL[0].key), yBot = panelTop("note")+panelH("note");
+  var r = winRange();
+  /* No window band in whole-record mode: a wash over every panel hides the red. */
+  if (!S.whole){
+    var x0=xOf(r[0]), x1=xOf(r[1]);
+    stX.fillStyle=COL.win;
+    panelSpans().forEach(function(sp){ stX.fillRect(x0, sp[0], Math.max(1.5, x1-x0), sp[1]-sp[0]); });
+    stX.strokeStyle=COL.winEdge; stX.lineWidth=1;
+    vlineBodies(stX, x0+0.5);
+  }
+  var mc = myCall();
+  if (mc.death_date){
+    var di = dayIdx(mc.death_date);
+    if (di>=0 && di<D.nd){
+      var xd=Math.round(xOf(di))+0.5;
+      stX.save(); stX.setLineDash([6,3]); stX.strokeStyle="#0a7d33"; stX.lineWidth=1.6;
+      vlineBodies(stX, xd); stX.restore();
+      stX.fillStyle="#0a7d33"; stX.font="bold 9.5px -apple-system,Helvetica,Arial";
+      stX.fillText("my death date", xd+4, yTop+10);
+      stX.font="10px -apple-system,Helvetica,Arial";
+    }
+  }
+  var xc=Math.round(xOf(S.i))+0.5;
+  stX.strokeStyle=COL.cursor; stX.lineWidth=1.3;
+  vlineBodies(stX, xc);
+  stX.fillStyle=COL.cursor;
+  /* The cursor's marker points down from the top edge of the first panel,
+     below its title. */
+  stX.beginPath(); stX.moveTo(xc,yTop+7); stX.lineTo(xc+4,yTop); stX.lineTo(xc-4,yTop);
+  stX.closePath(); stX.fill();
+  drawDetBars(stX);
+  PLACEHOLDERS.forEach(function(ph){ drawPlaceholder(stX, ph); });
+  var A = notes(), top=panelTop("note"), h=panelH("note");
+  stX.fillStyle=COL.note;
+  Object.keys(A).forEach(function(d){
+    var i=dayIdx(d); if (i<0||i>=D.nd) return;
+    var x=xOf(i);
+    stX.beginPath(); stX.moveTo(x, top+h-4); stX.lineTo(x+4, top+4); stX.lineTo(x-4, top+4);
+    stX.closePath(); stX.fill();
+  });
+}
+
+function drawMap(){
+  mapX.clearRect(0,0,MAPW,MAPH);
+  mapX.drawImage(mapBg, 0,0, MAPW, MAPH);
+  var r = winRange(), agg = {}, tot=0, k, j;
+  for (k=0;k<D.ds.length;k+=3){
+    var d=D.ds[k]; if (d<r[0]||d>r[1]) continue;
+    agg[D.ds[k+1]]=(agg[D.ds[k+1]]||0)+D.ds[k+2]; tot+=D.ds[k+2];
+  }
+  var trail=[];
+  for (var i=r[0];i<=r[1];i++) if (D.series.cx[i]!=null) trail.push(i);
+  /* Thin the trail above 200 points: a whole-record trail is otherwise an
+     opaque mat over the map and shows nothing of where the animal went. */
+  if (trail.length > 200){
+    var keep=[], step=Math.ceil(trail.length/200);
+    for (j=0;j<trail.length;j+=step) keep.push(trail[j]);
+    if (keep[keep.length-1] !== trail[trail.length-1]) keep.push(trail[trail.length-1]);
+    trail = keep;
+  }
+  if (trail.length>1){
+    mapX.lineWidth = trail.length > 120 ? 0.9 : 1.4;
+    for (j=1;j<trail.length;j++){
+      var a=trail[j-1], b=trail[j];
+      mapX.strokeStyle="rgba(60,60,60,"+(0.12 + 0.68*(j/(trail.length-1))).toFixed(3)+")";
+      mapX.beginPath();
+      mapX.moveTo(mx(D.series.cx[a]), my(D.series.cy[a]));
+      mapX.lineTo(mx(D.series.cx[b]), my(D.series.cy[b]));
+      mapX.stroke();
+    }
+  }
+  var mxv=0; Object.keys(agg).forEach(function(s){ if(agg[s]>mxv) mxv=agg[s]; });
+  /* Stations that heard the animal in the window: receiver rings, never
+     filled, sized by located detections. */
+  Object.keys(agg).forEach(function(sk){
+    var s=D.stations[+sk]; if(!s) return;
+    receiverRing(mapX, mx(s.lon), my(s.lat), 2.5 + 13*Math.sqrt(agg[sk]/Math.max(1,mxv)));
+  });
+  /* The animal's daily positions in the window, green with a black edge; the
+     cursor day's position is the larger point. */
+  trail.forEach(function(i){
+    if (i !== S.i) positionPoint(mapX, mx(D.series.cx[i]), my(D.series.cy[i]), 2.2);
+  });
+  if (D.series.cx[S.i] != null){
+    positionPoint(mapX, mx(D.series.cx[S.i]), my(D.series.cy[S.i]), 4.2);
+  }
+  var heardSt = stationsInWindow(r);
+  mapX.fillStyle="rgba(255,255,255,0.86)"; mapX.fillRect(6,6,290,30);
+  mapX.strokeStyle="#ddd"; mapX.strokeRect(6.5,6.5,290,30);
+  mapX.fillStyle="#222"; mapX.font="10.5px -apple-system,Helvetica,Arial";
+  mapX.fillText(dayStr(r[0]) + " to " + dayStr(r[1]) + "  (" + (r[1]-r[0]+1) + " d)", 12, 19);
+  mapX.fillText(fmtN(tot) + " located " + plural(tot, "detection") + "; " + heardSt + " of " +
+                D.sids.length + plural(D.sids.length, " station") + " heard it", 12, 31);
+}
+
+/* Stations (station_id) that heard the animal in the window. */
+function stationsInWindow(r){
+  var seen = {}, k;
+  for (k=0;k<D.dss.length;k+=3){ var d=D.dss[k]; if (d>=r[0] && d<=r[1]) seen[D.dss[k+1]] = 1; }
+  return Object.keys(seen).length;
+}
+function drawReadout(){
+  var r = winRange(), dets=0, ddays=0, dep=[], acc=[], i;
+  for (i=r[0];i<=r[1];i++){
+    var v=D.series.dets[i];
+    if (v>0){ dets+=v; ddays++; }
+    if (D.series.dep[i]!=null) dep.push(D.series.dep[i]);
+    if (D.series.acc[i]!=null) acc.push(D.series.acc[i]);
+  }
+  function med(a){ if(!a.length) return null; var b=a.slice().sort(function(x,y){return x-y;});
+    var m=Math.floor(b.length/2); return b.length%2 ? b[m] : (b[m-1]+b[m])/2; }
+  var rel = D.marks.flag==null ? "no candidate date"
+          : (S.i > D.marks.flag ? ("day " + (S.i-D.marks.flag) + " after the candidate date")
+          : (S.i === D.marks.flag ? "the candidate date itself" : ("day " + (D.marks.flag-S.i) + " before the candidate date")));
+  /* How even the detections are: a very even detection rate in one area is a
+     sign of a tag that has stopped moving. */
+  var dd = [];
+  for (i=r[0];i<=r[1];i++) if (D.series.dets[i]>0) dd.push(D.series.dets[i]);
+  var cv = null;
+  if (dd.length > 1){
+    var mu = dd.reduce(function(p,q){return p+q;},0)/dd.length;
+    var sd = Math.sqrt(dd.reduce(function(p,q){return p+(q-mu)*(q-mu);},0)/(dd.length-1));
+    cv = sd/mu;
+  }
+  var rows = [
+    ["cursor date", dayStr(S.i)], ["position relative to the candidate date", rel],
+    ["window", dayStr(r[0]) + " to " + dayStr(r[1])], ["days in window (calendar days)", fmtN(r[1]-r[0]+1)],
+    ["detection days in window", fmtN(ddays)], ["detections in window", fmtN(dets)],
+    ["coefficient of variation of daily detections, detection days in window", cv == null ? "needs 2 detection days" : fmt2(cv)],
+    ["stations heard in window (of " + D.sids.length + " in the detset)", fmtN(stationsInWindow(r))],
+    ["depth days in window", fmtN(dep.length)],
+    ["median daily depth in window (m)", dep.length ? fmt1(med(dep)) : "no depth data"],
+    [ACC_NAME + " days in window", fmtN(acc.length)],
+    ["median daily " + ACC_NAME + " in window (" + ACC_UNIT + ")", acc.length ? fmt2(med(acc)) : "no " + ACC_NAME + " data"]
+  ];
+  document.getElementById("rotab").innerHTML = rows.map(function(x){
+    return '<tr><td class="k">'+esc(x[0])+'</td><td class="v">'+esc(x[1])+'</td></tr>';
+  }).join("");
+}
+
+function redraw(){
+  /* The cursor has been moved once it leaves the day it opened on; only then
+     does a dead/shed call stamp the day in view. */
+  if (S.iOpen != null && S.i !== S.iOpen) S.touched = true;
+  var hintEl = document.getElementById("hint");
+  if (S.touched && hintEl.textContent === "move the cursor to the death day first") hintEl.textContent = "";
+  document.getElementById("curdate").textContent = dayStr(S.i);
+  document.getElementById("annodate").textContent = dayStr(S.i);
+  document.getElementById("slider").value = S.i;
+  drawStack(); drawMap(); drawReadout(); loadNoteFields();
+}
+
+/* ================= notes (localStorage) ==================================== */
+var NKEY = D.store + "_notes";
+function readStore(k){ try { return JSON.parse(localStorage.getItem(k) || "{}"); } catch(e){ return {}; } }
+function allNotes(){ return readStore(NKEY); }
+function notes(){ return allNotes()[D.animal.id] || {}; }
+function saveNotes(o){ var a=allNotes(); a[D.animal.id]=o; localStorage.setItem(NKEY, JSON.stringify(a)); }
+function loadNoteFields(){
+  var n = notes()[dayStr(S.i)] || {};
+  document.getElementById("annotext").value = n.note || "";
+  document.getElementById("annocall").value = n.call || "";
+}
+function renderNoteList(){
+  var n = notes(), ks = Object.keys(n).sort();
+  document.getElementById("notelist").innerHTML = ks.length
+    ? ks.map(function(d){ return '<div><a data-d="'+esc(d)+'">'+esc(d)+'</a> &nbsp; <b>'+
+        esc(n[d].call||"")+'</b> &nbsp; '+esc(n[d].note||"")+'</div>'; }).join("")
+    : '<div style="color:#888">no notes yet for this animal</div>';
+}
+function csvCell(v){ return '"' + String(v == null ? "" : v).replace(/"/g,'""') + '"'; }
+function download(lines, name){
+  var b=new Blob([lines.join("\n") + "\n"],{type:"text/csv"}), u=URL.createObjectURL(b),
+      l=document.createElement("a");
+  l.href=u; l.download=name; document.body.appendChild(l); l.click(); l.remove();
+}
+document.getElementById("annosave").addEventListener("click", function(){
+  var n = notes(), d = dayStr(S.i);
+  var t = document.getElementById("annotext").value, c = document.getElementById("annocall").value;
+  if (!t && !c) delete n[d]; else n[d] = {note:t, call:c, at:new Date().toISOString()};
+  saveNotes(n); renderNoteList(); drawStack();
+  /* A day note that carries a call is a call on the animal. A dead or shed note
+     saved at a new cursor date moves the death date, so a reviewer can correct
+     a date that is already set. */
+  if (c){
+    var p = {call: c};
+    /* Before the cursor moves the note's date is the first day of the record,
+       which is never a stamp: a first-day stamp removes the whole record. */
+    if (c === "dead_or_shed" && S.touched){ p.death_date = d; p.death_src = "day note"; p.death_time = ""; }
+    patchCall(p);
+  }
+});
+document.getElementById("annoclear").addEventListener("click", function(){
+  if (confirm("Delete every note stored in this browser for " + D.animal.id + "?")){
+    saveNotes({}); renderNoteList(); loadNoteFields(); drawStack();
+  }
+});
+document.getElementById("annocsv").addEventListener("click", function(){
+  var n = notes(), out = ["animal_id,date,call,note,annotated_at"];
+  Object.keys(n).sort().forEach(function(d){
+    out.push([D.animal.id, d, n[d].call, n[d].note, n[d].at].map(csvCell).join(","));
+  });
+  download(out, "day_notes_" + D.animal.slug + "_" + new Date().toISOString().slice(0,10) + ".csv");
+});
+document.getElementById("notelist").addEventListener("click", function(e){
+  if (!e.target.dataset.d) return;
+  S.i=Math.max(0,Math.min(D.nd-1,dayIdx(e.target.dataset.d))); redraw();
+});
+
+/* ================= calls (shared store with the index) ===================== */
+/* One verdict per animal under D.store, the key the index page reads and
+   exports, so a call made here appears there and in the one CSV. */
+function allCalls(){ return readStore(D.store); }
+function saveAllCalls(a){ localStorage.setItem(D.store, JSON.stringify(a)); }
+function myCall(){ return allCalls()[D.animal.id] || {}; }
+function patchCall(p){
+  var a = allCalls(), c = a[D.animal.id] || {};
+  Object.keys(p).forEach(function(k){ c[k] = p[k]; });
+  c.band = D.band.band; c.at = new Date().toISOString();
+  a[D.animal.id] = c; saveAllCalls(a);
+  paintCall(); drawStack();
+}
+/* Calls of the animals in this review only: another review that shares the
+   browser store must not change these counts. */
+function countCalls(a){
+  return D.nav.order.filter(function(o){ return a[o.id] && a[o.id].call; }).length;
+}
+function paintCall(){
+  var c = myCall(), a = allCalls(), done = countCalls(a);
+  [].forEach.call(document.querySelectorAll(".callb"), function(b){ b.classList.toggle("on", b.dataset.c === c.call); });
+  /* A call that took the candidate keeps its time; the filter cuts there. */
+  var dd = c.death_date ? c.death_date + (c.death_time ? " " + c.death_time.slice(11, 19) + " UTC" : "") +
+           (c.death_src ? " (" + c.death_src + ")" : "")
+         : (c.call === "dead_or_shed" ? "(not set: move the cursor to the death day and press X, or type the date)" : "(not set)");
+  document.getElementById("deathdate").textContent = dd;
+  if (document.activeElement !== document.getElementById("deathinput"))
+    document.getElementById("deathinput").value = c.death_date || "";
+  if (document.activeElement !== document.getElementById("calltext"))
+    document.getElementById("calltext").value = c.note || "";
+  document.getElementById("navpos").textContent = "animal " + D.nav.pos + " of " + D.nav.n + "  |  " + done + " called";
+  drawProg();
+  if (!document.body.classList.contains("tocoff")) tocRows();
+}
+function gotoAnimal(slug){ if (slug) location.href = slug + ".html"; }
+/* The date a dead/shed call stamps when none is set: the candidate date, or
+   nothing. D never stamps the day in view. The card opens on the first day of
+   the record, so a stamp of the day in view would put a D, on open or after a
+   stray arrow key, on a day the reviewer never chose, and remove most of an
+   alive record. X is the one key that takes the cursor date. */
+function stampDate(){
+  if (D.marks.flag != null) return { d: dayStr(D.marks.flag), src: "candidate", t: D.band.death_time || "" };
+  return null;
+}
+function makeCall(callName){
+  var p = { call: callName, note: document.getElementById("calltext").value }, undated = false;
+  if (callName === "dead_or_shed" && !myCall().death_date){
+    var st = stampDate();
+    if (st){ p.death_date = st.d; p.death_src = st.src; p.death_time = st.t; } else undated = true;
+  }
+  /* an alive call carries no death date, so a stamp left from an earlier call is cleared */
+  if (callName === "alive"){ p.death_date = ""; p.death_src = ""; p.death_time = ""; }
+  patchCall(p);
+  /* An undated dead/shed call removes nothing, so the card stays open and
+     asks for the date rather than moving on. */
+  if (undated){
+    document.getElementById("hint").textContent =
+      "no candidate date: move the cursor to the death day and press X, or type it";
+    return;
+  }
+  if (document.getElementById("autoadv").checked && D.nav.next_slug)
+    setTimeout(function(){ gotoAnimal(D.nav.next_slug); }, 150);
+}
+[].forEach.call(document.querySelectorAll(".callb"), function(b){
+  b.addEventListener("click", function(){ makeCall(b.dataset.c); });
+});
+/* The card opens on the first day of the record, so the day in view is not a
+   choice until the cursor has moved: X and "= cursor" refuse it there. */
+function stampCursor(){
+  var hint = document.getElementById("hint");
+  if (!S.touched){
+    hint.textContent = "move the cursor to the death day first";
+    return false;
+  }
+  hint.textContent = "";
+  patchCall({ death_date: dayStr(S.i), death_src: "cursor", death_time: "" });
+  return true;
+}
+document.getElementById("deathbtn").addEventListener("click", stampCursor);
+document.getElementById("deathinput").addEventListener("change", function(){
+  var v = this.value;
+  if (v && !/^\d{4}-\d{2}-\d{2}$/.test(v)) return;
+  patchCall(v ? { death_date: v, death_src: "typed", death_time: "" }
+              : { death_date: "", death_src: "", death_time: "" });
+});
+document.getElementById("calltext").addEventListener("change", function(){
+  if (myCall().call || this.value) patchCall({ note: this.value });
+});
+document.getElementById("prevanimal").addEventListener("click", function(){ gotoAnimal(D.nav.prev_slug); });
+document.getElementById("nextanimal").addEventListener("click", function(){ gotoAnimal(D.nav.next_slug); });
+
+var progC = document.getElementById("prog"), progX = progC.getContext("2d");
+var CALLCOL = { alive:"#2c7fb8", dead_or_shed:"#c2202a", uncertain:"#8a8a8a" };
+function drawProg(){
+  var w = progC.clientWidth || progC.parentNode.clientWidth, h = 14;
+  setCanvas(progC, progX, w, h);
+  progX.fillStyle = "#f1ede0"; progX.fillRect(0, 0, w, h);
+  var ord = D.nav.order, n = ord.length, a = allCalls();
+  if (!n) return;
+  var seg = w / n;
+  for (var j = 0; j < n; j++){
+    var c = a[ord[j].id];
+    if (c && c.call){ progX.fillStyle = CALLCOL[c.call] || "#8a8a8a"; progX.fillRect(j*seg, 2, Math.max(seg-0.4, 0.8), h-4); }
+  }
+  progX.fillStyle = "#111";
+  progX.fillRect(Math.max(0, (D.nav.pos - 1) * seg - 0.5), 0, Math.max(seg, 2.5), h);
+}
+progC.addEventListener("click", function(e){
+  var b = progC.getBoundingClientRect(), ord = D.nav.order;
+  if (!ord.length) return;
+  var j = Math.max(0, Math.min(ord.length-1, Math.floor((e.clientX-b.left)/b.width*ord.length)));
+  if (ord[j].s !== D.animal.slug) gotoAnimal(ord[j].s);
+});
+
+/* Sidebar: every animal in review order under its band, with my call. */
+var tocScrolled = false;
+var BANDLAB = {dead:"Dead band", review:"Review band", alive:"Alive band"};
+function tocRows(){
+  var list = document.getElementById("toclist"), keep = list.scrollTop;
+  var a = allCalls(), q = document.getElementById("tocq").value.toLowerCase(), dn = allNotes();
+  var ABBR = {alive:"A", dead_or_shed:"D/S", uncertain:"U"};
+  var html = [], lastBand = null;
+  D.nav.order.forEach(function(o, j){
+    var mine = a[o.id] || {};
+    var txt = (o.id + " " + o.sp + " " + o.b + " " + (mine.call||"") + " " + (mine.note||"")).toLowerCase();
+    if (q && txt.indexOf(q) === -1) return;
+    if (o.b !== lastBand){
+      var mem = D.nav.order.filter(function(z){ return z.b === o.b; });
+      var dc = mem.filter(function(z){ return a[z.id] && a[z.id].call; }).length;
+      html.push('<div class="grph"><span>' + (BANDLAB[o.b] || o.b) + ' (' + mem.length + ')</span><span>' +
+                dc + '/' + mem.length + ' called</span></div>');
+      lastBand = o.b;
+    }
+    var mc = mine.call ? '<span class="mine" style="color:'+(CALLCOL[mine.call]||"#555")+'">&#9679;'+(ABBR[mine.call]||"?")+'</span>'
+                       : '<span class="mine" style="color:#ccc">&mdash;</span>';
+    var nn = dn[o.id] ? Object.keys(dn[o.id]).length : 0;
+    html.push('<div class="row'+(o.s===D.animal.slug?" cur":"")+'" data-s="'+esc(o.s)+'"><span class="rk">'+(j+1)+'</span>'+
+      '<span class="fid">'+esc(o.id)+'</span>'+mc+(nn?'<span class="nb">'+nn+'n</span>':"")+'</div>');
+  });
+  list.innerHTML = html.join("");
+  var done = countCalls(a);
+  document.getElementById("tocfoot").textContent = done + " of " + D.nav.order.length + " called";
+  if (!tocScrolled){
+    var cur = document.querySelector("#toclist .row.cur");
+    if (cur) cur.scrollIntoView({block:"center"});
+    tocScrolled = true;
+  } else list.scrollTop = keep;
+}
+function tocToggle(force){
+  var off = force != null ? !force : !document.body.classList.contains("tocoff");
+  document.body.classList.toggle("tocoff", off);
+  localStorage.setItem(D.store + "_toc_hidden", off ? "1" : "0");
+  if (!off) tocRows();
+  layout();
+}
+document.getElementById("tocbtn").addEventListener("click", function(){ tocToggle(); });
+document.getElementById("tocclose").addEventListener("click", function(){ tocToggle(false); });
+document.getElementById("tocpeek").addEventListener("click", function(){ tocToggle(true); });
+document.getElementById("tocq").addEventListener("input", tocRows);
+document.getElementById("toclist").addEventListener("click", function(e){
+  var r = e.target.closest(".row");
+  if (r && r.dataset.s && r.dataset.s !== D.animal.slug) gotoAnimal(r.dataset.s);
+});
+function exportCalls(){
+  var a = allCalls(), out = ["animal_id,band,call,death_date,death_time,date_source,note,annotated_at,candidate_date"];
+  D.nav.order.forEach(function(o){
+    var v = a[o.id];
+    if (v && (v.call || v.note)) out.push([o.id, o.b, v.call, v.death_date, v.death_time || "", v.death_src, v.note, v.at, o.c].map(csvCell).join(","));
+  });
+  download(out, "mortality_calls_" + new Date().toISOString().slice(0,10) + ".csv");
+  return out;
+}
+document.getElementById("tocexport").addEventListener("click", exportCalls);
+document.getElementById("tocnotes").addEventListener("click", function(){
+  var all = allNotes(), out = ["animal_id,date,call,note,annotated_at"];
+  Object.keys(all).sort().forEach(function(id){
+    Object.keys(all[id]).sort().forEach(function(d){
+      var n = all[id][d]; out.push([id, d, n.call, n.note, n.at].map(csvCell).join(","));
+    });
+  });
+  download(out, "day_notes_all_animals_" + new Date().toISOString().slice(0,10) + ".csv");
+});
+
+/* ================= transport =============================================== */
+var slider = document.getElementById("slider");
+slider.max = D.nd-1;
+slider.addEventListener("input", function(){ S.i=+this.value; stop(); redraw(); });
+function setActive(cls, v){
+  [].forEach.call(document.querySelectorAll("."+cls), function(b){ b.classList.toggle("on", +b.dataset.v === v); });
+}
+[].forEach.call(document.querySelectorAll(".spd"), function(b){
+  b.addEventListener("click", function(){ S.speed=+b.dataset.v; setActive("spd",S.speed); });
+});
+[].forEach.call(document.querySelectorAll(".win"), function(b){
+  b.addEventListener("click", function(){ S.win=+b.dataset.v; S.whole=false;
+    document.getElementById("wholebtn").classList.remove("on"); setActive("win",S.win); redraw(); });
+});
+document.getElementById("extentbtn").addEventListener("click", function(){
+  setExtent(EXT.now === "animal" ? "whole" : "animal"); drawMapBg(); redraw();
+});
+document.getElementById("wholebtn").addEventListener("click", function(){
+  S.whole=!S.whole; this.classList.toggle("on", S.whole); redraw();
+});
+function step(n){ S.i=Math.max(0,Math.min(D.nd-1, S.i+n)); redraw(); }
+document.getElementById("stepb").addEventListener("click", function(){ stop(); step(-1); });
+document.getElementById("stepf").addEventListener("click", function(){ stop(); step(1); });
+
+var raf=null;
+function tick(ts){
+  if (!S.playing) return;
+  if (S.last == null) S.last=ts;
+  if (ts-S.last >= 50){
+    S.last=ts; S.i += S.speed;
+    if (S.i >= D.nd-1){ S.i=D.nd-1; redraw(); stop(); return; }
+    redraw();
+  }
+  raf=requestAnimationFrame(tick);
+}
+function play(){
+  if (S.i >= D.nd-1) S.i = 0;
+  S.playing=true; S.last=null;
+  document.getElementById("playbtn").textContent="pause";
+  document.getElementById("playbtn").classList.add("on");
+  raf=requestAnimationFrame(tick);
+}
+function stop(){
+  S.playing=false; if(raf) cancelAnimationFrame(raf); raf=null;
+  document.getElementById("playbtn").textContent="play";
+  document.getElementById("playbtn").classList.remove("on");
+}
+document.getElementById("playbtn").addEventListener("click", function(){ S.playing?stop():play(); });
+
+var dragging=false;
+function fromEvent(e){
+  var b=stC.getBoundingClientRect();
+  S.i = iOfX((e.clientX-b.left) * (stackW/b.width));
+  redraw();
+}
+/* Pointer events cover the mouse, a pen and a finger; the panels only take
+   horizontal drags, so a vertical swipe still scrolls the page on a phone. */
+stC.addEventListener("pointerdown", function(e){
+  dragging=true; stop(); fromEvent(e);
+  try { stC.setPointerCapture(e.pointerId); } catch(err){ /* capture is optional */ }
+});
+stC.addEventListener("pointermove", function(e){ if(dragging) fromEvent(e); });
+window.addEventListener("pointerup", function(){ dragging=false; });
+window.addEventListener("pointercancel", function(){ dragging=false; });
+
+/* Keys pause only in fields that take text. The slider and the checkbox are
+   inputs too, so they do not pause the keys. */
+var TYPING = "input[type=text], input[type=date], input[type=search], select, textarea";
+document.addEventListener("keydown", function(e){
+  if (e.target.matches && e.target.matches(TYPING)) return;
+  var k = e.key.toLowerCase();
+  if (e.key==="ArrowLeft"){ stop(); step(e.shiftKey?-7:-1); e.preventDefault(); }
+  else if (e.key==="ArrowRight"){ stop(); step(e.shiftKey?7:1); e.preventDefault(); }
+  else if (e.key===" "){ S.playing?stop():play(); e.preventDefault(); }
+  else if (e.key==="Home"){ stop(); S.i=0; redraw(); }
+  else if (e.key==="End"){ stop(); S.i=D.nd-1; redraw(); }
+  else if (k==="a"){ makeCall("alive"); }
+  else if (k==="d"||k==="s"){ makeCall("dead_or_shed"); }
+  else if (k==="u"){ makeCall("uncertain"); }
+  else if (k==="x"){ stampCursor(); }
+  else if (k==="n"){ gotoAnimal(D.nav.next_slug); }
+  else if (k==="p"){ gotoAnimal(D.nav.prev_slug); }
+  else if (k==="c"){ tocToggle(); }
+});
+
+/* ================= layout and boot ========================================= */
+function layout(){
+  stackW = Math.max(window.innerWidth < 760 ? 340 : 640, document.getElementById("stackwrap").clientWidth - 16);
+  setCanvas(stC, stX, stackW, STACKH);
+  drawStackBg();
+  setCanvas(mapC, mapX, MAPW, MAPH);
+  drawMapBg();
+  redraw();
+}
+window.addEventListener("resize", function(){ clearTimeout(window.__rt); window.__rt=setTimeout(layout, 150); });
+
+/* Deep link: ?d=YYYY-MM-DD sets the cursor, &w=1|7|30 the window, &whole=1 the
+   whole record. The cursor otherwise opens at the start of the animal's record,
+   its first day with a detection: day 0 of the axis shows an empty map when the
+   animal is first heard later. */
+(function(){
+  var q = new URLSearchParams(location.search);
+  S.i = D.marks.first != null ? D.marks.first : 0;
+  if (q.get("d")){ var i = dayIdx(q.get("d")); if (isFinite(i)){ S.i = Math.max(0, Math.min(D.nd-1, i)); S.touched = true; } }
+  S.iOpen = S.i;
+  if (q.get("w")) S.win = Math.max(1, +q.get("w") || S.win);
+  if (q.get("whole") === "1"){ S.whole = true; document.getElementById("wholebtn").classList.add("on"); }
+})();
+if (window.innerWidth < 760 || localStorage.getItem(D.store + "_toc_hidden") === "1") document.body.classList.add("tocoff");
+setActive("spd", S.speed); setActive("win", S.win);
+layout(); renderNoteList(); paintCall();
+
+/* For the headless self-test: read the state without touching the page. */
+window.__card = { state: S, data: D, step: step, redraw: redraw, exportCalls: exportCalls,
+                  makeCall: makeCall, play: play, stop: stop, stampCursor: stampCursor, myCall: myCall };
+</script>
+</body></html>
