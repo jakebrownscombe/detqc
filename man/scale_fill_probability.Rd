@@ -35,24 +35,26 @@ viridis yellow \code{"#FDE725"} over a dark ring, so they read at both ends.
 }
 \examples{
 # Stoney Lake, Ontario (100 m cells, depth in metres, zero or negative, land
-# NA). detfield and detqc each ship a copy of the raster.
-tif <- system.file("extdata", "stoney_depth.tif", package = "detfield")
-if (!nzchar(tif)) {
-  tif <- system.file("extdata", "stoney_depth.tif", package = "detqc")
+# NA). detfield and detqc each ship a copy of the raster; terra reads it.
+if (requireNamespace("terra", quietly = TRUE)) {
+  tif <- system.file("extdata", "stoney_depth.tif", package = "detfield")
+  if (!nzchar(tif)) {
+    tif <- system.file("extdata", "stoney_depth.tif", package = "detqc")
+  }
+  lake <- terra::as.data.frame(abs(terra::rast(tif)), xy = TRUE)
+  names(lake)[3] <- "depth"
+  # Detection probability of one transmission from each cell for a receiver
+  # in the deepest cell, on a logistic curve with d50 600 m and d05 1,200 m,
+  # by straight-line distance.
+  rx <- lake[which.max(lake$depth), c("x", "y")]
+  d <- sqrt((lake$x - rx$x)^2 + (lake$y - rx$y)^2)
+  lake$p <- stats::plogis(stats::qlogis(0.05) * (d - 600) / 600)
+  ggplot2::ggplot(lake, ggplot2::aes(x, y, fill = p)) +
+    ggplot2::geom_raster() +
+    scale_fill_probability() +
+    ggplot2::coord_equal() +
+    ggplot2::labs(x = "Easting (m, UTM 17N)", y = "Northing (m, UTM 17N)") +
+    annotation_scale_bar(location = "br") +
+    theme_positionr()
 }
-lake <- terra::as.data.frame(abs(terra::rast(tif)), xy = TRUE)
-names(lake)[3] <- "depth"
-# Detection probability of one transmission from each cell for a receiver
-# in the deepest cell, on a logistic curve with d50 600 m and d05 1,200 m,
-# by straight-line distance.
-rx <- lake[which.max(lake$depth), c("x", "y")]
-d <- sqrt((lake$x - rx$x)^2 + (lake$y - rx$y)^2)
-lake$p <- stats::plogis(stats::qlogis(0.05) * (d - 600) / 600)
-ggplot2::ggplot(lake, ggplot2::aes(x, y, fill = p)) +
-  ggplot2::geom_raster() +
-  scale_fill_probability() +
-  ggplot2::coord_equal() +
-  ggplot2::labs(x = "Easting (m, UTM 17N)", y = "Northing (m, UTM 17N)") +
-  annotation_scale_bar(location = "br") +
-  theme_positionr()
 }

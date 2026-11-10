@@ -25,18 +25,20 @@ most negative cell, the deepest, is still blue4.
 }
 \examples{
 # Stoney Lake, Ontario (100 m cells, depth in metres, zero or negative, land
-# NA). detfield and detqc each ship a copy of the raster.
-tif <- system.file("extdata", "stoney_depth.tif", package = "detfield")
-if (!nzchar(tif)) {
-  tif <- system.file("extdata", "stoney_depth.tif", package = "detqc")
+# NA). detfield and detqc each ship a copy of the raster; terra reads it.
+if (requireNamespace("terra", quietly = TRUE)) {
+  tif <- system.file("extdata", "stoney_depth.tif", package = "detfield")
+  if (!nzchar(tif)) {
+    tif <- system.file("extdata", "stoney_depth.tif", package = "detqc")
+  }
+  lake <- terra::as.data.frame(abs(terra::rast(tif)), xy = TRUE)
+  names(lake)[3] <- "depth"
+  ggplot2::ggplot(lake, ggplot2::aes(x, y, fill = depth)) +
+    ggplot2::geom_raster() +
+    scale_fill_depth() +
+    ggplot2::coord_equal() +
+    ggplot2::labs(x = "Easting (m, UTM 17N)", y = "Northing (m, UTM 17N)") +
+    annotation_scale_bar(location = "br") +
+    theme_positionr()
 }
-lake <- terra::as.data.frame(abs(terra::rast(tif)), xy = TRUE)
-names(lake)[3] <- "depth"
-ggplot2::ggplot(lake, ggplot2::aes(x, y, fill = depth)) +
-  ggplot2::geom_raster() +
-  scale_fill_depth() +
-  ggplot2::coord_equal() +
-  ggplot2::labs(x = "Easting (m, UTM 17N)", y = "Northing (m, UTM 17N)") +
-  annotation_scale_bar(location = "br") +
-  theme_positionr()
 }
