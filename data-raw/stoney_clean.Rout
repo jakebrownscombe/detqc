@@ -1,0 +1,28 @@
+Warning message:
+package 'testthat' was built under R version 4.2.3 
+[1] 3297
+[1] 20
+[1] 4
+The two checks against the detection field need `field`; they did not run.
+
+   flag not run    pass 
+      1       7      21 
+
+listening    silent 
+       77       103 
+                   step rows_before rows_after removed
+1                detset        3297       3297       0
+2     calibrate_sensors        3297       3297       0
+3          check_detset        3297       3297       0
+4       audit_listening        3297       3297       0
+5     filter_duplicates        3297       3297       0
+6   filter_post_release        3297       3191     106
+7        filter_min_lag        3191       3148      43
+8 apply_mortality_calls        3148       3148       0
+9      filter_mortality        3148       1938    1210
+[1] 1938
+        table                  file format rows
+1  detections stoney_detections.csv glatos 3297
+2 deployments  stoney_receivers.csv glatos   20
+3     animals stoney_detections.csv glatos    4
+[1] 19992

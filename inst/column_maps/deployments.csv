@@ -1,0 +1,52 @@
+format,target,source,sep,type,tz,note
+otn,receiver_serial,ins_serial_no,,character,,OTN deployment sheet
+otn,receiver_serial,receiver_serial_number,,character,,OTN AAT receiver file
+otn,receiver_serial,rcvrserial,,character,,OTN moorings receivers file
+otn,receiver_serial,rcvr_serial,,character,,OTN stations-receivers file
+otn,station_id,station_name,,character,,OTN deployment CSV
+otn,station_id,otn_array;station_no,,character,,OTN deployment sheet: array and station number joined
+otn,station_id,array_station_no,,character,,"OTN deployment CSV with ARRAY: STATION_NO alone; the reader copies it"
+otn,station_id,receiver_reference_id,,character,,OTN AAT receiver file
+otn,deploy_datetime,deploy_date_time,,datetime,UTC,
+otn,deploy_datetime,deploy_date,,datetime,UTC,
+otn,deploy_datetime,time,,datetime,UTC,OTN AAT receiver file
+otn,recover_datetime,recover_date_time,,datetime,UTC,
+otn,recover_datetime,recovery_date,,datetime,UTC,
+otn,recover_datetime,last_download,,datetime,UTC,
+otn,recover_datetime,recovery_datetime_utc,,datetime,UTC,OTN AAT receiver file
+otn,download_datetime,download_date_time,,datetime,UTC,OTN deployment sheet
+otn,download_datetime,last_download,,datetime,UTC,OTN deployment CSV
+otn,deploy_lat,deploy_lat,,numeric,,
+otn,deploy_lat,stn_lat,,numeric,,
+otn,deploy_lat,latitude,,numeric,,
+otn,deploy_lon,deploy_long,,numeric,,
+otn,deploy_lon,stn_long,,numeric,,
+otn,deploy_lon,longitude,,numeric,,
+otn,deploy_z,ins_depth,,numeric,,
+otn,deploy_z,depth,,numeric,,
+otn,deploy_z,instrument_depth,,numeric,,OTN instrument deployment short form
+otn,receiver_model,ins_model_no,,character,,
+otn,receiver_model,model,,character,,
+otn,receiver_model,receiver_model,,character,,
+otn,receiver_transmitter,transmitter,,character,,"OTN instrument deployment short form, TRANSMITTER: a transceiver's own pinger, or a sentinel tag on the mooring"
+glatos,receiver_serial,ins_serial_no,,character,,
+glatos,station_id,station,,character,,
+glatos,station_id,glatos_array;station_no,-,character,,
+glatos,deploy_datetime,deploy_date_time,,datetime,UTC,
+glatos,deploy_datetime,glatos_deploy_date_time_utc,,datetime,UTC,GLATOS workbook: local glatos_deploy_date_time at glatos_timezone; the reader converts it
+glatos,recover_datetime,recover_date_time,,datetime,UTC,
+glatos,recover_datetime,glatos_recover_date_time_utc,,datetime,UTC,GLATOS workbook: local glatos_recover_date_time at glatos_timezone; the reader converts it
+glatos,deploy_lat,deploy_lat,,numeric,,
+glatos,deploy_lon,deploy_long,,numeric,,
+glatos,deploy_z,instrument_depth,,numeric,,
+glatos,receiver_model,ins_model_no,,character,,
+detqc,receiver_serial,receiver_serial,,character,,"detqc's own column names, as write.csv() writes a detqc table"
+detqc,station_id,station_id,,character,,
+detqc,deploy_datetime,deploy_datetime,,datetime,,
+detqc,recover_datetime,recover_datetime,,datetime,,
+detqc,deploy_lat,deploy_lat,,numeric,,
+detqc,deploy_lon,deploy_lon,,numeric,,
+detqc,deploy_z,deploy_z,,numeric,,
+detqc,download_datetime,download_datetime,,datetime,,
+detqc,receiver_transmitter,receiver_transmitter,,character,,
+detqc,receiver_model,receiver_model,,character,,

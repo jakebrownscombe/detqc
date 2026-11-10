@@ -1,0 +1,99 @@
+# R CMD check on three operating systems with release R, once on Ubuntu
+# without the Suggests that the hard dependencies do not bring, and the
+# tests from the source tree on the three systems. Tests that read the
+# vignette sources or the README skip inside R CMD check, which sees only
+# the built package, so the last job runs them.
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+name: R-CMD-check.yaml
+
+permissions: read-all
+
+jobs:
+  R-CMD-check:
+    runs-on: ${{ matrix.config.os }}
+    name: ${{ matrix.config.os }} (${{ matrix.config.r }})
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - {os: macos-latest, r: 'release'}
+          - {os: windows-latest, r: 'release'}
+          - {os: ubuntu-latest, r: 'release'}
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      R_KEEP_PKG_SOURCE: yes
+      NOT_CRAN: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-pandoc@v2
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: ${{ matrix.config.r }}
+          use-public-rspm: true
+          extra-repositories: https://ocean-tracking-network.r-universe.dev
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::rcmdcheck
+          needs: check
+      - uses: r-lib/actions/check-r-package@v2
+        with:
+          upload-snapshots: true
+          build_args: 'c("--no-manual", "--compact-vignettes=gs+qpdf")'
+
+  hard-dependencies-only:
+    # The library holds the hard dependencies, and pak and sessioninfo, which
+    # the setup action installs. Two Suggests, scales and withr, arrive
+    # through ggplot2; the others are absent. Plain R CMD build and check
+    # keeps rcmdcheck and its own dependencies out of the library. Vignettes
+    # are skipped because knitr is a Suggests that nothing here brings.
+    runs-on: ubuntu-latest
+    name: ubuntu-latest (release, hard dependencies only)
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      _R_CHECK_FORCE_SUGGESTS_: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+          use-public-rspm: true
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          dependencies: '"hard"'
+      - name: Build and check with the hard dependencies only
+        shell: bash
+        run: |
+          R CMD build --no-build-vignettes --no-manual .
+          R CMD check --no-manual --ignore-vignettes detqc_*.tar.gz
+          grep '^Status:' detqc.Rcheck/00check.log
+          ! grep -Eq '^Status:.*(ERROR|WARNING)' detqc.Rcheck/00check.log
+
+  test-local:
+    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.os }} (release, tests from the source tree)
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      NOT_CRAN: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-pandoc@v2
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+          use-public-rspm: true
+          extra-repositories: https://ocean-tracking-network.r-universe.dev
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::pkgload, any::testthat
+          needs: check
+      - name: Run the tests with testthat::test_local()
+        shell: Rscript {0}
+        run: testthat::test_local(".", reporter = "summary", stop_on_failure = TRUE)

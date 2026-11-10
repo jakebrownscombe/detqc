@@ -1,0 +1,81 @@
+format,target,source,sep,type,tz,note
+otn,datetime,datecollectedutc,,datetime,UTC,OTN extract after the parquet rollout
+otn,datetime,datecollected,,datetime,UTC,OTN extract before the parquet rollout; its timezone column is checked
+otn,receiver_serial,receiver,,character,,
+otn,receiver_serial,collectornumber,,character,,minimal OTN extracts leave receiver blank
+otn,transmitter,sensorname,,character,,a sensor detection's own code; tagName holds the pinger code
+otn,transmitter,tagname,,character,,
+otn,transmitter,fieldnumber,,character,,minimal OTN extracts
+otn,animal_id,catalognumber,,character,,
+otn,station_id,station,,character,,
+otn,deploy_lat,decimallatitude,,numeric,,
+otn,deploy_lat,latitude,,numeric,,
+otn,deploy_lon,decimallongitude,,numeric,,
+otn,deploy_lon,longitude,,numeric,,
+otn,sensor_raw,sensorraw,,numeric,,
+otn,sensor_value,sensorvalue,,numeric,,
+otn,sensor_unit,sensorunit,,character,,
+otn,sensor_type,sensortype,,character,,
+otn,species,commonname,,character,,
+otn,tag_name,tagname,,character,,the pinger code OTN files a sensor detection under
+glatos,datetime,detection_timestamp_utc,,datetime,UTC,
+glatos,receiver_serial,receiver_sn,,character,,
+glatos,transmitter,transmitter_codespace;transmitter_id,-,character,,
+glatos,animal_id,animal_id,,character,,
+glatos,station_id,station,,character,,
+glatos,deploy_lat,deploy_lat,,numeric,,
+glatos,deploy_lon,deploy_long,,numeric,,
+glatos,sensor_value,sensor_value,,numeric,,readings with unit ADC or none move to sensor_raw
+glatos,sensor_unit,sensor_unit,,character,,
+glatos,species,common_name_e,,character,,
+glatos,tag_model,tag_model,,character,,
+vue,datetime,date_and_time_utc,,datetime,UTC,
+vue,receiver_serial,receiver,,character,,
+vue,transmitter,transmitter,,character,,
+vue,animal_id,transmitter_name,,character,,
+vue,station_id,station_name,,character,,
+vue,deploy_lat,latitude,,numeric,,VUE writes +0 when no position is set
+vue,deploy_lon,longitude,,numeric,,
+vue,sensor_value,sensor_value,,numeric,,readings with unit ADC or none move to sensor_raw
+vue,sensor_unit,sensor_unit,,character,,
+otn_qualified,datetime,datecollectedutc,,datetime,UTC,"OTN qualified, unqualified and sentinel extracts: catalogNumber names a detection or tag, not an animal"
+otn_qualified,datetime,datecollected,,datetime,UTC,extract before the June 2025 renaming; its timezone column is checked
+otn_qualified,receiver_serial,receiverserial,,character,,
+otn_qualified,receiver_serial,collectornumber,,character,,"the receiver serial, such as 348; receiver holds the OTN deployment id, such as HFX068-00348-1"
+otn_qualified,receiver_serial,receiver,,character,,
+otn_qualified,transmitter,sensorname,,character,,
+otn_qualified,transmitter,tagname,,character,,
+otn_qualified,transmitter,fieldnumber,,character,,
+otn_qualified,station_id,station,,character,,
+otn_qualified,deploy_lat,decimallatitude,,numeric,,
+otn_qualified,deploy_lat,latitude,,numeric,,
+otn_qualified,deploy_lon,decimallongitude,,numeric,,
+otn_qualified,deploy_lon,longitude,,numeric,,
+otn_qualified,sensor_raw,sensorraw,,numeric,,
+otn_qualified,sensor_value,sensorvalue,,numeric,,
+otn_qualified,sensor_unit,sensorunit,,character,,
+otn_qualified,sensor_type,sensortype,,character,,
+otn_qualified,catalog_number,catalognumber,,character,,
+otn_qualified,tag_name,tagname,,character,,
+vdat,datetime,time,,datetime,UTC,corrected receiver time; the reader writes the row's Time Offset (h) onto it
+vdat,datetime,device_time_utc,,datetime,UTC,uncorrected device clock where Time is blank
+vdat,receiver_serial,serial_number,,character,,
+vdat,receiver_model,model,,character,,
+vdat,transmitter,full_id,,character,,
+vdat,station_id,station_name,,character,,mobile receivers only
+vdat,deploy_lat,latitude,,numeric,,mobile receivers only
+vdat,deploy_lon,longitude,,numeric,,
+vdat,sensor_raw,raw_data,,numeric,,
+vdat,sensor_value,sensor_value,,numeric,,DET_SENS records
+vdat,sensor_unit,sensor_unit,,character,,
+vdat,sensor_type,sensor_function,,character,,
+detqc,datetime,datetime,,datetime,,"detqc's own column names, as write.csv() writes a detqc table"
+detqc,receiver_serial,receiver_serial,,character,,
+detqc,transmitter,transmitter,,character,,
+detqc,animal_id,animal_id,,character,,
+detqc,station_id,station_id,,character,,
+detqc,sensor_raw,sensor_raw,,numeric,,
+detqc,sensor_value,sensor_value,,numeric,,
+detqc,sensor_unit,sensor_unit,,character,,
+detqc,sensor_type,sensor_type,,character,,
+detqc,receiver_model,receiver_model,,character,,

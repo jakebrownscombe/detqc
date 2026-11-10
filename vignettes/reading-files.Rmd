@@ -1,0 +1,1133 @@
+---
+title: "Base processing: read, check, and filter telemetry data"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Base processing: read, check, and filter telemetry data}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE, purl = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+# Print to 76 columns; with the "#> " prefix a printed line is at most 79.
+options(width = 76)
+# Wrap long lines of output, such as the text of an error, to the column
+# so that the remedy at their end is in view.
+local({
+  wrap <- function(hook) {
+    force(hook)
+    function(x, options) {
+      lines <- strsplit(x, "\n", fixed = TRUE)[[1]]
+      wide <- startsWith(lines, "#> ") & nchar(lines) > 79
+      lines[wide] <- vapply(lines[wide], function(l) {
+        body <- sub("^#> ", "", l)
+        lead <- nchar(sub("^( *).*$", "\\1", body))
+        body <- strwrap(body, width = 75, indent = lead, exdent = lead + 2)
+        paste0("#> ", body, collapse = "\n")
+      }, "")
+      hook(paste0(paste(lines, collapse = "\n"), "\n"), options)
+    }
+  }
+  for (h in c("output", "message", "warning", "error")) {
+    knitr::knit_hooks$set(setNames(list(wrap(knitr::knit_hooks$get(h))), h))
+  }
+})
+# Write counts below ten as words in the text.
+nw <- function(n) {
+  if (n < 10) c("no", "one", "two", "three", "four", "five", "six", "seven",
+                "eight",
+                "nine")[n + 1] else format(n, big.mark = ",")
+}
+cap_nw <- function(n) {
+  w <- nw(n)
+  paste0(toupper(substr(w, 1, 1)), substring(w, 2))
+}
+big <- function(n) format(n, big.mark = ",")
+# Write a UTC time as "14:24 UTC on 2 June".
+when <- function(t) {
+  t <- as.POSIXct(t, tz = "UTC")
+  paste(format(t, "%H:%M UTC on"), as.integer(format(t, "%d")), format(t, "%B"))
+}
+```
+
+The same detections reach a study in different layouts: an OTN extract, a GLATOS export, a VUE
+export of the receivers. The import functions read each of them into the same columns, with every
+time in UTC (Figure 1). [Get started](detqc.html) runs the whole pipeline once; this page goes
+deep on the file formats, the checks and the filters.
+
+```{r result-figure, fig.height = 4.4, fig.alt = "Detections per hour of 3 June 2024 as read from an OTN extract, a GLATOS export and a VUE export; the three panels are the same.", fig.cap = sprintf("**Figure 1.** Detections per hour of 3 June 2024, as read from each of the three exports: %s.", paste(sprintf("%s %s", names(one_day), vapply(one_day, nrow, 1L)), collapse = ", "))}
+library(detqc)
+# Locate the example files included with the package
+extdata_dir <- system.file("extdata", package = "detqc")
+in_file <- function(name) file.path(extdata_dir, name)
+
+# Read 3 June 2024 from each of the three exports
+one_day <- list(
+  OTN = read_detections(in_file("stoney_otn.csv")),
+  GLATOS = read_detections(in_file("stoney_detections.csv"),
+                           cut = list(from = "2024-06-03", to = "2024-06-04")),
+  VUE = read_detections(in_file("stoney_vue.csv"))
+)
+vapply(one_day, nrow, 1L)
+# Take the UTC hour of each detection, by export
+per_hour <- do.call(rbind, lapply(names(one_day), function(export) {
+  data.frame(export = export,
+             hour = as.integer(format(one_day[[export]]$datetime, "%H",
+                                      tz = "UTC")))
+}))
+# Draw the detections per hour, one panel per export
+ggplot2::ggplot(per_hour, ggplot2::aes(hour)) +
+  ggplot2::geom_bar(fill = "#31688E", width = 0.85) +
+  ggplot2::facet_wrap(~export, ncol = 1) +
+  ggplot2::scale_x_continuous(breaks = c(0, 6, 12, 18, 23)) +
+  ggplot2::labs(x = "Hour of 3 June 2024 (UTC)", y = "Detections") +
+  theme_positionr() +
+  ggplot2::theme(panel.grid.minor = ggplot2::element_blank())
+```
+
+## Supported file formats
+
+Each import function takes its column names, types and time zones from a column map that comes
+with the package. With `format = "auto"`, the default, `read_detections()` picks one of these
+from the header of the file:
+
+- `"otn"`: an OTN detection extract, CSV or Parquet, matched to animals, qualified, unqualified or
+  sentinel. A Parquet extract's `geometry` column holds binary values and is dropped with a
+  message;
+- `"glatos"`: a GLATOS detection export;
+- `"vue"`: a VUE or Fathom detection export with the VUE header;
+- `"vdat"`: a Fathom VDAT CSV, from a receiver's VRL or VDAT file. VDAT CSV exports of VR2Tx
+  and NexTrak receivers are both read, their detections and their status records.
+
+The VRL or VDAT file itself is binary, so no function reads it: export it to a VDAT CSV with
+Fathom Connect first. A zip archive, as OTN publishes some extracts, is unzipped first. Both
+stop with a message that says so.
+
+`read_receiver_logs()` reads the receiver's own status records from the same VDAT CSV (see
+[Receiver logs](#receiver-logs)).
+
+`read_deployments()` reads OTN deployment sheets (the instrument deployment short form, CSV or
+Excel), the OTN deployment CSV, OTN AAT receiver files, the OTN moorings receivers file and the
+OTN stations-receivers file, GLATOS receiver location files and the deployment sheet of a GLATOS
+project workbook. `read_animals()` reads the OTN tagging sheet, the OTN tag release file, the
+tagging sheet of a GLATOS workbook and GLATOS detection exports. Excel files need the **readxl**
+package. Both take `format = "auto"` by default and pick the OTN or GLATOS map from the header,
+whichever fills more of the contract columns. Given a format that leaves a contract column empty
+while the other format's columns are in the file, they warn and name the column. When the column
+is one the table needs, as `station_id` of a GLATOS receiver file read with `format = "otn"`, they
+stop and name the format `"auto"` picks. The OTN tagging template often leaves
+`ANIMAL_ID` blank while the OTN matched extract names animals by `catalogNumber`: read such a sheet
+with `missing_id = "transmitter"`, and the release filters match the extract's detections to it by
+transmitter and release time.
+
+```{r maps}
+# List the detection file formats, and show the GLATOS map
+unique(column_map("detections")$format)
+column_map("detections", "glatos")[, c("target", "source", "type", "tz")]
+```
+
+Each row maps one column of the file (`source`) to one column `read_detections()` returns
+(`target`).
+Where several rows name one target, the first with a value is used, row by row. A `source` with a
+`;` joins two columns: the GLATOS `transmitter_codespace` and `transmitter_id` become one
+`transmitter`, "A69-9002-61002". The fifth map, `otn_qualified`, reads an OTN extract not
+matched to animals, in which `catalogNumber` never names an animal, so `animal_id` is `NA`.
+
+## One study, three exports
+
+The three files of Figure 1 hold 3 June 2024 of the Stoney study as an OTN extract, a GLATOS
+export and a VUE export. The code below asks which format each was read as, and whether the reads
+agree.
+
+```{r three-formats}
+# Show the format recognised in each file
+vapply(one_day, function(det) attr(det, "source")[[1]]$format, "")
+# Test that the OTN and VUE reads give the same times and transmitters
+otn <- one_day$OTN
+vue <- one_day$VUE
+identical(otn$datetime, vue$datetime) && identical(otn$transmitter,
+                                                   vue$transmitter)
+head(otn[, c("datetime", "receiver_serial", "transmitter", "animal_id",
+             "station_id")], 3)
+# Count the rows of the VUE export that name no animal
+sum(is.na(vue$animal_id))
+```
+
+A VUE export does not know which animal carries each transmitter, so `animal_id` is missing on
+every row; `detset()` fills it from the animals table.
+
+## A file with its own column names
+
+Given a lab's own detection file, which rarely matches any export, `read_detections()` stops and
+names the columns it found:
+
+```{r own-file}
+# Write a detection file in a lab's own layout, in local time
+own_file <- file.path(tempdir(), "my_detections.csv")
+writeLines(c(
+  "Date_Local,Rx,TagCode,Fish",
+  "2024-06-03 09:06:06,R011,A69-9002-61002,ST-02",
+  "2024-06-03 18:45:59,R011,A69-9002-61002,ST-02",
+  "2024-06-04 06:12:40,R013,A69-1601-61001,ST-01"
+), own_file)
+# Read it: read_detections() stops and names the columns it found
+try(read_detections(own_file))
+```
+
+A column map gives one row per column you have, with the column it becomes and its type; every
+other column is kept, its name in lower case with `_` between words.
+
+```{r own-map}
+# Map each column of the file to the column it becomes, and its type
+my_map <- data.frame(
+  target = c("datetime", "receiver_serial", "transmitter", "animal_id"),
+  source = c("Date_Local", "Rx", "TagCode", "Fish"),
+  type = c("datetime", "character", "character", "character")
+)
+# Read the file through the map, its times in Eastern time
+read_detections(own_file, format = "vue", col_map = my_map,
+                tz = "America/Toronto")
+```
+
+With a data frame as `col_map`, your map replaces the packaged one, and `format` adds only the
+step that belongs to that kind of file: `"otn"` sets aside rows whose receiver is `release`,
+`"vdat"` reads the record layout of a Fathom file, and `"vue"`, the one to use for a plain CSV,
+treats a station position of 0, 0 as missing. Without `format`, a file that no format fits is
+read by your map alone. To start from a packaged map, copy its rows with
+`column_map()` and change `source`. When the format reads every column but a few, give those few
+as pairs, such as `col_map = c(receiver_serial = "Rx")`; they are merged into the format's map,
+and every other column is read as the format reads it. A pair of columns joined by `;` is joined
+in the order given. GLATOS joins `transmitter` from `transmitter_codespace;transmitter_id` in a
+detection export and from `tag_code_space;tag_id_code` in a workbook's tagging sheet, so a pair
+for it names both columns in that order: `c(transmitter = "transmitter_codespace;tag_id")`. A
+GLATOS pair or row of a full map in another order, or of three or more columns, stops with an
+error that gives the format's order.
+
+In any format, columns joined for `transmitter` must give codes such as `A69-1601-12345`: a code
+space in the first column, digits in each later column, and `"-"` between them. The `"vue"` map
+reads `transmitter` from one column and joins with nothing, so two columns read as `"vue"` need a
+full map whose `transmitter` row has the `sep` `"-"`. A pair or a row of one column is tested in
+every format, unless the format reads that column for `transmitter` itself. A one-column source
+of whole codes reads. So does a code-space column under a name no packaged map reads, because
+shape cannot tell the two apart. A code-space column a packaged map reads, such as
+`transmitter_codespace`, stops by its name. So does a column the maps read for a receiver, a
+station, a time or a position. A column of IDs alone stops. A pair whose column is not in the
+file stops too.
+`read_deployments()` and `read_animals()` take `col_map` too.
+
+## Time zones
+
+Every positionR function expects UTC. OTN, GLATOS and VUE exports are written in UTC, and a
+header or a stamp that states its offset, such as `Date and Time (UTC-04:00)` or
+`2024-05-01T10:00:00-04:00`, is read at that offset. A file kept in local time needs `tz`, a zone
+name from `OlsonNames()`: above, `tz = "America/Toronto"` read 09:06 on 3 June, Eastern Daylight
+Time, as 13:06 UTC. The deployment and tagging import functions take the same argument.
+
+Daylight saving causes two problems in local files. A clock time inside the spring gap, which
+never happened in that zone, stops `read_detections()`:
+
+```{r spring-gap}
+# Write and read a local time inside the spring daylight-saving gap
+gap_file <- file.path(tempdir(), "local_time.csv")
+writeLines(c("Date_Local,Rx,TagCode,Fish",
+             "2024-03-10 02:30:00,R011,A69-9002-61002,ST-02"), gap_file)
+try(read_detections(gap_file, format = "vue", col_map = my_map,
+                    tz = "America/Toronto"))
+```
+
+The file's clock did not follow the zone you gave: read a receiver whose clock stayed on standard
+time all year with a fixed offset, such as `tz = "Etc/GMT+5"` for UTC-5 (the sign is reversed in
+these names). A clock time in the repeated autumn hour is read as standard time, with a warning
+that counts such times. Once the data are in a detection set, the `non_utc` and `dst_jump` checks
+of `check_detset()` look for offsets the import functions could not see.
+
+## Several files, and studies too large for memory
+
+A study often arrives as many export files, one per receiver download or per year, and a large
+network's detections may not fit in the memory of one computer. `read_detections()` reads many
+files in one call and stacks them into one table, and its `cut` argument keeps only the rows you
+ask for as each file is read, so memory holds one whole file at a time rather than the whole
+study.
+
+Given several paths, `read_detections()` names the file of each row in `source_file`; a column
+one file lacks is `NA` in its rows.
+
+```{r stack}
+# Read two files in one call; source_file names each row's file
+stacked <- read_detections(c(in_file("stoney_otn.csv"),
+                             in_file("stoney_vue.csv")))
+table(stacked$source_file)
+```
+
+`cut` takes `from` and `to`, times in UTC, and `transmitters`, the codes to keep. The code below
+reads 5 and 6 June of one transmitter and counts what the cut left out:
+
+```{r cut}
+# Read 5 and 6 June of one transmitter, cut as the file is read
+two_days <- read_detections(in_file("stoney_detections.csv"),
+                            cut = list(from = "2024-06-05", to = "2024-06-07",
+                                       transmitters = "A69-9002-61003"))
+range(two_days$datetime)
+# Count the rows read, kept, and outside the cut
+cut_record <- attr(two_days, "source")[[1]]
+cut_record[c("rows_read", "rows", "rows_outside_cut")]
+```
+
+The `source` attribute has one record per file: the file, the format, the time zone and the rows
+read and kept. `detset()` copies these records into the detection set, and the processing report
+lists them.
+
+## Receiver files: VDAT
+
+From a Fathom VDAT CSV, `read_detections()` reads the detections (`DET`) and the sensor
+detections (`DET_SENS`), drops a `DET` record that repeats a `DET_SENS` record, and keeps the
+receiver's own transmitter settings in an attribute. The example is the first 150 detections of
+receiver R011:
+
+```{r vdat}
+# Read the VDAT file of receiver R011
+vdat <- read_detections(in_file("stoney_vdat.csv"))
+table(vdat$transmitter)
+# Show the receiver's own transmitter settings
+attr(vdat, "receiver_transmitters")
+```
+
+A VDAT file keeps fractions of a second, while GLATOS, OTN and VUE exports write whole seconds, so
+one detection read from both differs by a fraction of a second. Below, the Stoney export is
+stacked with a copy of itself half a second later, as a VDAT file of the same receivers would give
+it:
+
+```{r tolerance-set}
+# Read the receivers and tagging records
+deployments <- read_deployments(in_file("stoney_receivers.csv"),
+                                format = "glatos")
+animals <- read_animals(in_file("stoney_detections.csv"), format = "glatos")
+# Read the export, and make a copy of it half a second later
+whole <- read_detections(in_file("stoney_detections.csv"))
+fraction <- whole
+fraction$datetime <- fraction$datetime + 0.5
+# Build one detection set holding both
+dets_doubled <- detset(rbind(whole, fraction), deployments, animals)
+```
+
+`filter_duplicates()` runs with exact matching and with `tolerance_s = 1`.
+
+```{r tolerance}
+# Count the detections removed by the last step of the log
+removed <- function(dets) tail(detset_log(dets)$removed, 1)
+# Count the copies removed with exact matching, and within 1 s
+c(exact = removed(filter_duplicates(dets_doubled)),
+  tolerance_1s = removed(filter_duplicates(dets_doubled, tolerance_s = 1)))
+```
+
+Only the tolerance catches the copies. Keep `tolerance_s` below the shortest delay between
+transmissions of your tags, so that two real
+transmissions are never merged.
+
+## Receiver logs
+
+In a VDAT CSV from a VR2Tx, the receiver's own status records come hourly or daily: the temperature,
+the noise, the tilt, the pulses counted and the battery
+(`DIAG`, `TEMP`, `ATTITUDE`, `BATTERY`, `HEALTH_VR2TX`), with event records such as the
+initialisation, a reboot or a download (`EVENT_INIT`, `EVENT`, `EVENT_OFFLOAD`).
+`read_receiver_logs()` reads them into one table, one row per record. A `DIAG` record also counts
+the detections the receiver decoded since its previous `DIAG` record, of every transmitter it
+heard, in `log_detections`.
+
+```{r receiver-logs}
+# Read the logs of the example receivers, one file per receiver
+log_files <- list.files(in_file("receiver_logs"), full.names = TRUE)
+logs <- read_receiver_logs(log_files)
+# Count the records by type
+table(logs$record_type)
+```
+
+```{r logs-coverage, include = FALSE, purl = FALSE}
+rx_all <- sort(unique(deployments$receiver_serial))
+rx_logged <- sort(unique(logs$receiver_serial))
+rx_no_log <- setdiff(rx_all, rx_logged)
+stopifnot(length(rx_no_log) == 1L)
+# The model of the receiver with no log, from the deployment sheet
+no_log_model <- deployments$receiver_model[deployments$receiver_serial == rx_no_log]
+# The logged receivers are VR2Tx in their logs and in the deployment sheet
+stopifnot(all(startsWith(logs$receiver_model, "VR2Tx")),
+          all(deployments$receiver_model[deployments$receiver_serial %in% rx_logged] == "VR2Tx"))
+```
+
+The synthetic logs cover the `r length(rx_logged)` VR2Tx receivers of the example, one file each,
+and hold the record types counted above; `r rx_no_log`, a `r no_log_model`, has no log.
+
+Given these logs, `audit_listening()` reads them on each full day on which a receiver has no
+detection in the set, inside the dates its log covers. It reads such a quiet day in one of three
+ways. A day with no status record is `off`: the receiver was not running, and the day counts as
+not listening; no detection count can change that. A day with status records and no detection
+counted is `deaf` when a reference tag was expected and not heard, which counts as not listening,
+and `logging_silent` when none was expected, which counts as listening. A day on which the
+receiver's own `DIAG` records counted detections is `listening` (`reference_missed` when a
+reference tag was expected): the receiver decoded a transmitter that day, of this project or
+another, though the set holds none of those detections. A day with a detection
+in the set keeps its status, and the days of a receiver with no log keep the statuses of the
+detections and reference tags alone.
+
+```{r audit-logs}
+# Build the set, and audit each receiver-day with the logs
+dets_logged <- detset(read_detections(in_file("stoney_detections.csv")),
+                      deployments, animals)
+dets_logged <- audit_listening(
+  dets_logged, known_listening = unique(deployments$receiver_serial),
+  logs = logs
+)
+# Count receiver-days by status
+table(dets_logged$listening$status)
+```
+
+```{r logs-figure, fig.width = 7, fig.height = 4.4, fig.alt = "Each Stoney receiver by day, coloured by the status the audit gave with the receiver logs; R007 is off on 6 and 7 June and R020 silent.", fig.cap = sprintf("**Figure 2.** Status of each receiver and day from `audit_listening()` with the synthetic receiver logs, %s receiver-days.", big(nrow(dets_logged$listening)))}
+# Draw one tile per receiver and day, coloured by status
+ggplot2::ggplot(dets_logged$listening,
+                ggplot2::aes(date, receiver_serial, fill = status)) +
+  ggplot2::geom_tile(colour = "white", linewidth = 0.4) +
+  ggplot2::scale_fill_manual(values = c(listening = "#2C5AA0",
+                                        logging_silent = "#B8C7DE",
+                                        silent = "grey70", off = "#C0392B"),
+                             name = NULL) +
+  ggplot2::scale_x_date(date_labels = "%d %b", date_breaks = "1 day",
+                        expand = c(0, 0)) +
+  ggplot2::labs(x = "Date (UTC)", y = "Receiver") +
+  theme_positionr() +
+  ggplot2::theme(panel.grid = ggplot2::element_blank())
+```
+
+```{r logs-counts, include = FALSE, purl = FALSE}
+off_days <- dets_logged$listening[dets_logged$listening$status == "off", ]
+```
+
+R007 logged nothing on `r nw(nrow(off_days))` days, so the audit reads them as days it did not
+listen, where the detections alone would have called them silent and listening. R020 has no log,
+so its days stay `silent`. This example has no reference tags, so no day can be `deaf`; with your
+own data give them in `reference_tags`. `as_detfield_input()` hands the `off` and `deaf` days,
+as not listening, to the [**detfield**](https://jakebrownscombe.github.io/detfield/) R package,
+the positioning component of positionR.
+
+The example's logs count exactly the detections of its export, so on the set as read no quiet day
+has a count. Evidence of listening is lost before the audit sees it in two ways: an export holds
+one project's tags, so the detections of other projects' tags were never in it, and a filter run
+before the audit removes detections that a working receiver decoded. The code below shows the
+second: it filters first, the order [Get started](detqc.html#audit-the-listening-days) avoids,
+then audits with and without the logs.
+
+```{r logs-after-filters}
+# Remove the post-release and isolated detections before the audit
+dets_filtered <- filter_post_release(dets_logged, hours = 6)
+dets_filtered <- filter_min_lag(dets_filtered, max_lag_s = 4500)
+# Audit the filtered set without the logs, then with them
+working_rx <- unique(deployments$receiver_serial)
+no_logs <- audit_listening(dets_filtered, known_listening = working_rx)
+with_logs <- audit_listening(dets_filtered, known_listening = working_rx,
+                             logs = logs)
+# List the quiet days that the logs' detection counts keep listening
+quiet_heard <- with_logs$listening$status == "listening" &
+  with_logs$listening$detections == 0
+data.frame(with_logs$listening[quiet_heard, c("receiver_serial", "date")],
+           without_logs = no_logs$listening$status[quiet_heard],
+           with_logs = with_logs$listening$status[quiet_heard])
+```
+
+```{r logs-after-check, include = FALSE, purl = FALSE}
+# The two audits list the same receiver-days in the same order
+key <- function(l) paste(l$receiver_serial, l$date)
+stopifnot(identical(key(no_logs$listening), key(with_logs$listening)),
+          sum(quiet_heard) > 0,
+          all(no_logs$listening$status[quiet_heard] == "silent"))
+```
+
+On these `r nw(sum(quiet_heard))` receiver-days the filters removed every detection in the set,
+and the receiver's own count shows it heard. A receiver counts every transmitter it decodes,
+whatever the project, so the logs also recover the days on which it heard only tags an export
+left out. Audit before you filter, and give the logs where you have them.
+
+A NexTrak receiver writes its status as `DIAG_NEXTRAK` records every 10 minutes, with the noise in
+dB, where a VR2Tx writes `DIAG` hourly with the noise in mV. `read_receiver_logs()` reads both.
+The package includes a synthetic NexTrak log of one receiver over three days.
+
+```{r nextrak-log}
+# Read the included NexTrak log
+nextrak <- read_receiver_logs(in_file("nextrak_receiver_log.csv"))
+# Count the records by type
+table(nextrak$record_type)
+# Show three DIAG_NEXTRAK records: 10 minutes apart, noise in dB
+nextrak_diag <- nextrak[nextrak$record_type == "DIAG_NEXTRAK", ]
+head(nextrak_diag[, c("receiver_model", "datetime", "noise", "noise_unit",
+                      "log_detections")], 3)
+```
+
+`read_receiver_logs()` reads Fathom VDAT CSV files. A file with status records and no `DIAG` or
+`DIAG_NEXTRAK` record, as a NexTrak export of Fathom Connect 4.0 can be, is named in a message, and
+`DATA_ERROR` records are counted in a message. The yearly receiver-event CSV files that VUE
+exports are not read.
+
+## Sensors and tag specifications
+
+A sensor reading with no unit, or with the unit `ADC`, is a raw count: it goes to `sensor_raw`, and
+`sensor_value` stays `NA` until it is calibrated. A reading with a physical unit goes to
+`sensor_value`. When Fathom has the tag's specification, a VDAT file gives both side by side. The
+code counts the VDAT rows of each kind and shows one of each:
+
+```{r sensor-columns}
+# Count the VDAT rows with a raw count, a converted value, or both
+has_raw <- !is.na(vdat$sensor_raw)
+has_value <- !is.na(vdat$sensor_value)
+table(raw = has_raw, value = has_value)
+# Show one row of each kind
+sensor_cols <- c("transmitter", "sensor_raw", "sensor_value", "sensor_unit")
+vdat[c(which(has_raw & !has_value)[1], which(has_raw & has_value)[1]),
+     sensor_cols]
+```
+
+The manufacturer provides the calibrations in the tag specification sheet, which `read_tag_specs()`
+reads as the InnovaSea Excel sheet or as a CSV with its columns:
+
+```{r specs}
+# Read the tag sheet: delays and sensor calibration of each tag
+stoney_specs <- read_tag_specs(in_file("stoney_tag_specs.csv"))
+stoney_specs[, c("transmitter", "tag_serial", "min_delay", "max_delay",
+                 "sensor_type",
+                 "sensor_unit", "sensor_slope", "sensor_intercept")]
+```
+
+`calibrate_sensors()` converts raw values of any sensor type (depth, temperature, acceleration) as
+`sensor_value = sensor_intercept + sensor_slope * sensor_raw`, with each transmitter's slope,
+intercept and unit, and logs how many it converted. The animals read above have no calibration, so
+the sheet is given as `specs`:
+
+```{r calibrate}
+# Build a detection set and calibrate it with the tag sheet
+dets <- calibrate_sensors(detset(whole, deployments, animals), stoney_specs)
+# Count readings by unit, and give the range of each animal's values
+table(dets$detections$sensor_unit, useNA = "ifany")
+tapply(dets$detections$sensor_value, dets$detections$animal_id, range)
+# Print the log record of the calibration
+detset_log(dets)$reason[2]
+```
+
+```{r calibrate-counts, include = FALSE, purl = FALSE}
+in_m <- dets$detections$sensor_value[dets$detections$sensor_unit %in% "m"]
+```
+
+All `r big(length(in_m))` raw depth readings were calibrated, from `r round(min(in_m), 1)` m to
+`r round(max(in_m), 1)` m. Given to `read_animals()` as `tag_specs` instead, as in the next
+sections and on [Get started](detqc.html), the sheet puts the calibration in the animals table,
+and `calibrate_sensors(dets)` needs no `specs`.
+
+### Tags that send two codes
+
+A tag with a pinger and a sensor, or two sensors, sends two transmitter codes, and tagging sheets
+often list only one. With `tag_specs`, `read_animals()` gives every code of a tag's serial its own
+row on that animal; the tagging sheet needs `tag_serial`. The example gives tag 1600102 of ST-02 a
+second, pinger code, A69-1601-61102, then reads a lab's tagging CSV that lists one code per
+animal.
+
+```{r two-codes-specs}
+# Read the tag sheet as text, and add a second code for tag 1600102
+sheet <- read.csv(in_file("stoney_tag_specs.csv"), colClasses = "character")
+second <- sheet[sheet$TAG_SERIAL_NUMBER == "1600102", ]
+second[, c("Transmitter", "Tag.Type", "Sensor.Type", "Units", "Slope",
+           "Intercept")] <-
+  list("A69-1601-61102", "V13P-1x", "", "", "", "")
+# Write the new sheet and read it back
+two_code_sheet <- file.path(tempdir(), "two_code_specs.csv")
+write.csv(rbind(sheet, second), two_code_sheet, row.names = FALSE)
+specs <- read_tag_specs(two_code_sheet)
+specs[specs$tag_serial == "1600102", c("transmitter", "tag_serial",
+                                       "sensor_type")]
+```
+
+
+```{r two-codes}
+# Write a lab's tagging CSV with one code per animal
+tagging <- file.path(tempdir(), "my_tagging.csv")
+writeLines(c(
+  "Fish,Code,Serial,Species,Released",
+  "ST-01,A69-1601-61001,1600101,walleye,2024-06-02 11:30",
+  "ST-02,A69-9002-61002,1600102,walleye,2024-06-02 11:30"
+), tagging)
+# Map the columns of that file
+tag_map <- data.frame(
+  target = c("animal_id", "transmitter", "tag_serial", "species",
+             "release_datetime"),
+  source = c("Fish", "Code", "Serial", "Species", "Released"),
+  type = c("character", "character", "character", "character", "datetime")
+)
+# Read the file as "otn", the default, which adds no step to a plain CSV;
+# "glatos" would convert GLATOS local release times.
+read_animals(tagging, format = "otn", col_map = tag_map, tz = "America/Toronto",
+             tag_specs = specs)[, c("animal_id", "transmitter", "tag_serial",
+                                    "min_delay", "sensor_type")]
+```
+
+ST-02 gets both codes, each with its delays, sensor type and calibration from the specification
+sheet where the tagging sheet leaves them blank. A tag serial missing from the specification sheet
+gets a warning that names it; such a tag has no delays, and a sensor tag also loses its second code
+and its calibration, so read the sheet of every order of tags.
+
+## The data-entry checks
+
+`check_detset()` runs the checks below, in this order, reports each with a count and its
+denominator, returns the offending rows in `dets$checks$rows`, and never changes the data. Some
+need an input you give, and report `not run` without it: `water` (a polygon of the water body, or
+a depth raster in metres, positive down) for the land and depth checks; `field` (a detection range
+in metres, or a detection field from the
+[**detfield**](https://jakebrownscombe.github.io/detfield/) R package, the positioning component of
+positionR) for the last two; a `download_datetime` column for
+the download check; `max_liberty_years` in `check_settings()` for records that run longer after
+release than any tag lasts; and `reference_tags`, the transmitters built into or moored at
+receivers, whose detections prove that a receiver was listening, for the co-detection tests of
+moved moorings.
+
+An OTN deployment sheet records the receiver's own transmitter, or a sentinel tag on the same
+mooring, in its `TRANSMITTER` column; `read_deployments()` reads it as `receiver_transmitter`.
+When you give no `reference_tags`, `check_detset()` and `audit_listening()` use those ids, each at
+its deployment's position, and say so in a message; an id that the animals table also lists is
+left out with a warning. To use other ids, pass them: to `check_detset(reference_tags = )` as
+`transmitter`, `deploy_lat` and `deploy_lon`, and to `audit_listening(reference_tags = )` as
+`transmitter` and, optionally, the `receiver_serial` expected to hear each. Keep their detections
+in the set until both have run.
+
+The example includes the Stoney receivers as an OTN short form with a `TRANSMITTER` column: the
+transmitter built into each VR2Tx and, for R020, a VR2W, a sentinel tag on its mooring. R020's
+id is written without its code space, so it cannot be matched to a detection:
+
+```{r receiver-transmitter}
+# Read the OTN deployment sheet with its TRANSMITTER column
+otn_deployments <- read_deployments(in_file("stoney_otn_deployments.csv"),
+                                    format = "otn")
+# Show the last three receivers and their own transmitter ids
+tail(otn_deployments[, c("receiver_serial", "receiver_model",
+                         "receiver_transmitter")], 3)
+# Audit the receiver-days with the ids as the reference tags
+dets_own <- detset(read_detections(in_file("stoney_detections.csv")),
+                   otn_deployments, animals)
+own_rx <- unique(otn_deployments$receiver_serial)
+dets_own <- audit_listening(dets_own, known_listening = own_rx)
+table(dets_own$listening$status)
+```
+
+```{r receiver-transmitter-check, include = FALSE, purl = FALSE}
+own_ids <- otn_deployments$receiver_transmitter[!is.na(otn_deployments$receiver_transmitter)]
+stopifnot(!any(dets_own$detections$transmitter %in% own_ids))
+```
+
+None of the `r length(own_ids)` ids occurs in the example's detections, so the audit warns that they
+test no receiver. Where a receiver logs its own transmitter on most days, a day on which it hears
+neither that tag nor an animal is `reference_silent` and counts as not listening.
+
+```{r checks-table}
+# List every check, its group, what it flags and what it counts
+checks <- attr(all_checks(), "table")
+knitr::kable(checks[, c("check", "group", "description", "unit")],
+             col.names = c("Check", "Group", "What it flags", "Counted in"))
+```
+
+Each threshold is a choice you state. `check_settings()` lists them with their defaults; change
+one by name:
+
+```{r settings}
+# Show the thresholds and their defaults
+str(check_settings())
+# Run the checks with two thresholds changed
+dets <- check_detset(dets, settings = check_settings(station_tol_m = 50,
+                                                     year_off_days = 200))
+```
+
+```{r silent-before, include = FALSE, purl = FALSE}
+check_summary <- dets$checks$summary
+silent_before <- check_summary$flagged[check_summary$check == "receiver_silent"]
+```
+
+`?check_settings` says what each threshold does, and `?check_detset` gives the limits of three
+checks measured on test arrays.
+
+## What the checks catch
+
+Four errors common in real data are planted below in the Stoney study: a station with its latitude
+and longitude swapped, a false detection, an animal whose detections are missing, and detections
+written with a wrong code space. The code below reads the depth raster and the tagging records
+joined to the tag sheet.
+
+```{r study}
+# Read the depth raster: 100 m cells, UTM zone 17N, depth stored as
+# zero or negative metres, land NA
+lake <- terra::rast(in_file("stoney_depth.tif"))
+# Read the tagging records joined to the Stoney tag sheet
+animals <- read_animals(in_file("stoney_detections.csv"), format = "glatos",
+                        tag_specs = stoney_specs)
+# Use the GLATOS export read above
+detections <- whole
+```
+
+Station S010 gets its latitude and longitude swapped, as a typing error in a deployment sheet would
+swap them.
+
+```{r plant-swap}
+# Swap the latitude and longitude of S010 in a copy of the deployments
+deployments_swapped <- deployments
+s010 <- deployments_swapped$station_id == "S010"
+deployments_swapped[s010, c("deploy_lat", "deploy_lon")] <-
+  deployments[s010, c("deploy_lon", "deploy_lat")]
+```
+
+The false detection, such as a collision of two transmissions can produce, copies the 100th
+detection of ST-01 to the station farthest from it, two minutes later. It goes into the detections
+themselves, since no check is expected to find it.
+
+```{r plant-false}
+# Project the receivers to the raster's UTM grid to measure distances
+lonlat <- as.matrix(deployments[, c("deploy_lon", "deploy_lat")])
+utm <- terra::project(lonlat, from = "EPSG:4326", to = terra::crs(lake))
+stations <- data.frame(station_id = deployments$station_id, x = utm[, 1],
+                       y = utm[, 2])
+# Pick a true detection, and the station farthest from its own
+true_row <- detections[detections$animal_id == "ST-01", ][100, ]
+at_true <- stations$station_id == true_row$station_id
+far <- stations[which.max((stations$x - stations$x[at_true])^2 +
+                            (stations$y - stations$y[at_true])^2), ]
+# Make the false detection: same transmitter, far station, 2 min later
+false_row <- true_row
+false_row$datetime <- true_row$datetime + 120
+false_row$station_id <- far$station_id
+far_dep <- deployments$station_id == far$station_id
+false_row$receiver_serial <- deployments$receiver_serial[far_dep]
+false_row[, c("datetime", "receiver_serial", "station_id")]
+# Add the false detection to the detections
+detections <- rbind(detections, false_row)
+```
+
+A copy of the detections leaves out ST-03 and writes the first 25 detections of ST-04, tag
+`A69-1601-61004`, as `A69-1303-61004`.
+
+```{r plant-codes}
+# Leave ST-03's detections out of a copy of the detections
+detections_planted <- detections[detections$animal_id != "ST-03", ]
+# Write ST-04's first 25 detections with a wrong code space
+st04_first <- which(detections_planted$animal_id == "ST-04")[1:25]
+detections_planted$transmitter[st04_first] <- "A69-1303-61004"
+detections_planted$animal_id[st04_first] <- NA
+# Count detections by transmitter in the copy
+table(detections_planted$transmitter)
+```
+
+`check_detset()` runs on the planted copies, with the depth raster as `water` and a range of
+1,500 m as `field`.
+
+```{r check-planted}
+# Build a detection set of the planted copies and check it
+dets <- check_detset(detset(detections_planted, deployments_swapped, animals),
+                     water = abs(lake), field = 1500)
+# Print the checks that flagged
+check_summary <- dets$checks$summary
+check_summary[check_summary$status == "flag",
+              c("check", "flagged", "of", "unit")]
+```
+
+`swapped_lat_lon` finds S010 and suggests the position with the two values swapped back:
+
+```{r swapped-rows}
+# Show the swapped station, with the position the check suggests
+dets$checks$rows$swapped_lat_lon[, c("station_id", "deploy_lat", "deploy_lon",
+                                     "suggested_lat", "suggested_lon")]
+```
+
+`transmitter_no_animal` puts the wrong code first among the codes no animal carries, and
+`animal_never_heard` names ST-03:
+
+```{r code-rows}
+# List the transmitters heard that no animal carries, most heard first
+dets$checks$rows$transmitter_no_animal[, c("transmitter", "detections",
+                                           "receivers")]
+# List the animals of the tagging records with no detection
+dets$checks$rows$animal_never_heard
+```
+
+Fix an error where it was made, in the deployment sheet or the detection file, and read the file
+again. Here the correct tables go back in, with the false detection still among the detections:
+
+```{r fix}
+# Rebuild the set with the correct deployments and the full detections
+dets <- check_detset(detset(detections, deployments, animals),
+                     water = abs(lake), field = 1500)
+# Print the checks that still flag
+check_summary <- dets$checks$summary
+check_summary[check_summary$status == "flag",
+              c("check", "flagged", "of", "unit")]
+```
+
+```{r flag-counts, include = FALSE, purl = FALSE}
+silent_n <- check_summary$flagged[check_summary$check == "receiver_silent"]
+silent_of <- check_summary$of[check_summary$check == "receiver_silent"]
+# Confirm that the false detection is the only detection at its station
+far_true_n <- sum(whole$station_id == far$station_id)
+stopifnot(far_true_n == 0, silent_before - silent_n == 1)
+jump_m <- sqrt((far$x - stations$x[at_true])^2 +
+                 (far$y - stations$y[at_true])^2)
+```
+
+The swap and the two tag-code errors are gone. `receiver_silent` flags one receiver fewer than the
+`r nw(silent_before)` of the unplanted study ([Run the checks](detqc.html#run-the-checks) on Get
+started), because the false detection is the only one at `r far$station_id`. `receiver_silent` and
+`audit_listening()` count a detection of any transmitter in the set, including codes no animal
+carries; what they cannot count is a detection the export never held, except that
+`audit_listening()` given `logs` counts the detections the receiver's own log recorded. A detection
+export
+holds one project's tags, so a receiver that heard only other projects' tags looks silent. Confirm
+a silent receiver against the field records, or against its log, whose detection counts include
+every transmitter it decoded; `audit_listening()` reads them ([Receiver logs](#receiver-logs)).
+The false
+detection passes every check, because one detection at a real receiver is a valid record. On the
+map (Figure 3) it is a jump no walleye swims in two minutes, and `filter_speed()` removes it
+below.
+
+```{r jump-map, fig.width = 7, fig.height = 5.4, fig.alt = "Map of Stoney Lake shaded by depth, with the receivers that heard the four walleye as yellow rings sized by their detections, the receivers that heard none as white rings, and a dashed red line from the station that heard ST-01 to the station of the planted false detection, at the far end of the lake.", fig.cap = sprintf("**Figure 3.** The planted false detection, on the repaired set with the false detection still in it: %s heard ST-01 at %s, and the false detection puts it at %s 2 min later, about %s m away (the dashed line). %s of the %s receivers heard none of the four walleye.", true_row$station_id, when(true_row$datetime), far$station_id, big(round(jump_m, -2)), cap_nw(silent_n), silent_of)}
+# Map the receivers over the lake depth, sized by their detections
+receiver_map <- plot_receivers(dets, water = lake)
+# Take the positions of the station that heard ST-01 and of the false
+# detection's station
+jump_ends <- receiver_map$data[match(c(true_row$station_id, far$station_id),
+                                     receiver_map$data$station_id), ]
+# The rings cannot show the jump the filter acts on, so a keyed line draws it
+jump <- data.frame(x = jump_ends$deploy_lon[1], y = jump_ends$deploy_lat[1],
+                   xend = jump_ends$deploy_lon[2], yend = jump_ends$deploy_lat[2])
+receiver_map +
+  ggplot2::geom_segment(data = jump,
+                        ggplot2::aes(x = x, y = y, xend = xend, yend = yend,
+                                     linetype = "Jump to the false detection"),
+                        inherit.aes = FALSE, colour = "red3", linewidth = 0.8) +
+  ggplot2::scale_linetype_manual(name = NULL,
+                                 values = c("Jump to the false detection" = 2)) +
+  # The receiver rings are keyed in every legend; this key shows the line alone
+  ggplot2::guides(linetype = ggplot2::guide_legend(override.aes = list(shape = NA)))
+```
+
+## Data filtering
+
+Each filter runs only when you call it and adds one record to the log with the detections it
+removed and why; run the ones your study needs. `filter_duplicates()` and `filter_post_release()`
+run on [Get started](detqc.html), and the tolerance of `filter_duplicates()` is shown under VDAT
+above. Look
+at the set first: `plot_abacus()` draws each animal's detections by station and hour (Figure 4).
+
+```{r abacus-counts, include = FALSE, purl = FALSE}
+lanes_n <- nrow(unique(dets$detections[, c("animal_id", "station_id")]))
+```
+
+```{r abacus, fig.width = 7, fig.height = 5.2, fig.alt = "Detections of the four walleye by station and hour; ST-02's record ends on one row from 4 June.", fig.cap = sprintf("**Figure 4.** `plot_abacus(dets, rows = \"station\")` on the repaired set, the false detection still in it: one point per animal, station and hour with a detection, on one row for each station that heard the animal (%s rows).", lanes_n)}
+# Draw the detections by animal, station and hour
+plot_abacus(dets, rows = "station")
+```
+
+```{r st02-run, include = FALSE, purl = FALSE}
+st02 <- dets$detections[dets$detections$animal_id == "ST-02", ]
+final_station <- st02$station_id[which.max(st02$datetime)]
+last_other <- max(st02$datetime[st02$station_id != final_station])
+```
+
+ST-01's lone point at `r false_row$station_id` on 3 June is the planted false detection.
+ST-02's record ends on one row: after `r when(last_other)` it is heard only at
+`r final_station`, as a dead animal or a shed tag would be. No filter removes that record;
+[Mortality filtering](mortality-review.html) reviews it.
+
+`filter_release()` removes detections before each animal's release.
+
+```{r filter-release}
+# Remove detections before each release
+dets <- filter_release(dets)
+tail(detset_log(dets)[, c("step", "rows_before", "rows_after", "removed")], 1)
+```
+
+`filter_deployment_period()` removes detections outside every deployment of their receiver.
+
+```{r filter-deployment-period}
+# Remove detections outside every deployment of their receiver
+dets <- filter_deployment_period(dets)
+tail(detset_log(dets)[, c("step", "rows_before", "rows_after", "removed")], 1)
+```
+
+`filter_tag_life()` removes detections after the end of the tag's expected life.
+
+```{r filter-tag-life}
+# Remove detections after the end of the tag's life
+dets <- filter_tag_life(dets)
+tail(detset_log(dets)[, c("step", "rows_before", "rows_after", "removed")], 1)
+```
+
+The Stoney files hold no detection before a release or outside a deployment, and the tags last
+`r unique(animals$tag_life_days)` days, so the three remove none, and the log records each.
+
+### Impossible speeds
+
+`filter_speed()` removes detections that imply an animal swam faster than `max_speed_ms`, the
+highest speed you accept for your species. Steps between stations closer than `min_dist_m`, the
+largest distance at which two of your receivers hear one transmission, are never removed; it has no
+default, so take it from your range tests. The code below explores that distance: it fits the
+range test included with the package for its d05, the distance at which a receiver hears 5% of
+transmissions, and reads the d05 of the deepest receiver between it and the Stoney range model at
+35 m.
+
+```{r speed-range}
+# Fit the range test's d05: a logistic curve of the share heard on distance
+range_test <- read.csv(in_file("stoney_range_test.csv"))
+test_depth <- range_test$deploy_z[1]
+range_fit <- glm(cbind(detections, transmissions - detections) ~ distance_m,
+                 family = binomial, data = range_test)
+d05_test <- (qlogis(0.05) - coef(range_fit)[[1]]) / coef(range_fit)[[2]]
+# Read d05 linearly from the test depth to the deepest receiver, towards
+# the deep end of the positionR range model of Stoney Lake (1,500 m at
+# 35 m), as detfield::de_logistic() reads it.
+deep_d05 <- 1500
+deep_depth <- 35
+d05_deepest_exact <- approx(c(test_depth, deep_depth), c(d05_test, deep_d05),
+                            xout = max(deployments$deploy_z))$y
+# Round it to the nearest 100 m
+d05_deepest <- round(d05_deepest_exact, -2)
+# Print the test depth, its d05, the deepest receiver and its d05
+round(c(test_depth_m = test_depth, d05_test_m = d05_test,
+        deepest_receiver_m = max(deployments$deploy_z),
+        d05_deepest_m = d05_deepest_exact, d05_deepest_rounded_m = d05_deepest), 2)
+```
+
+The deepest d05, `r format(round(d05_deepest_exact, 2), big.mark = ",")` m, rounds to
+`r big(d05_deepest)` m. Two receivers up to about `r big(2 * d05_deepest)` m apart, twice that, can
+share a
+transmission, so `min_dist_m` is set to 2,500 m.
+
+```{r speed-settings}
+# Set the highest speed accepted, 2 m/s, and the largest distance at which
+# two receivers hear one transmission, 2,500 m
+max_speed <- 2
+min_dist <- 2500
+```
+
+`speed_steps()` returns each step between consecutive detections of one animal, with its distance
+and speed, and marks the violations; it removes nothing.
+
+```{r speed-steps}
+# List each step between consecutive detections of one animal, and its speed
+steps <- speed_steps(dets, max_speed_ms = max_speed, min_dist_m = min_dist)
+nrow(steps)
+```
+
+A speed can be read only from a step between two different stations:
+
+```{r speed-moves}
+# Keep the steps between two different stations
+moves <- steps[steps$dist_m > 0, ]
+nrow(moves)
+```
+
+The steps the filter treats as violations:
+
+```{r speed-violations}
+# Show the steps farther than min_dist and faster than max_speed
+moves[moves$violation, c("animal_id", "datetime", "dist_m", "speed_ms")]
+```
+
+```{r speed-figure, fig.width = 7, fig.height = 4.2, fig.alt = "Speed of each step between detections against the distance between the two stations, with the filter settings as dashed lines and two steps in the shaded corner.", fig.cap = sprintf("**Figure 5.** Speed of each step between consecutive detections of one animal at two different stations, against the distance between them, before `filter_speed()` (%s steps of %s animals). Dashed lines: `max_speed_ms` (%g m/s) and `min_dist_m` (%s m); the filter acts on the corner beyond both. Triangles: the two steps into and out of the planted false detection. %s on the top edge: one transmission heard at two stations in the same second, a step of no time and so of no finite speed.", big(nrow(moves)), nw(length(unique(moves$animal_id))), max_speed, big(min_dist), cap_nw(sum(is.infinite(moves$speed_ms))))}
+# Mark the two steps into and out of the planted detection
+planted <- moves$animal_id == "ST-01" &
+  (moves$datetime == false_row$datetime | moves$from == false_row$datetime)
+# The axis labels the powers of ten from 0.001 to 1,000 m/s that fall inside
+# the plotted range
+ticks <- 10^(-3:3)
+steps_lab <- "Step into or out of the planted detection"
+mark_col <- stats::setNames(c("#31688E", "#D55E00"), c("Step", steps_lab))
+mark_shape <- stats::setNames(c(1, 17), c("Step", steps_lab))
+corner <- data.frame(xmin = min_dist, xmax = Inf, ymin = max_speed, ymax = Inf)
+ggplot2::ggplot(moves, ggplot2::aes(dist_m, speed_ms)) +
+  ggplot2::geom_rect(data = corner, ggplot2::aes(xmin = xmin, xmax = xmax,
+                                                 ymin = ymin, ymax = ymax,
+                                                 fill = "Where the filter acts"),
+                     inherit.aes = FALSE, alpha = 0.2) +
+  ggplot2::geom_hline(yintercept = max_speed, linetype = 2) +
+  ggplot2::geom_vline(xintercept = min_dist, linetype = 2) +
+  ggplot2::geom_point(ggplot2::aes(colour = "Step", shape = "Step")) +
+  ggplot2::geom_point(data = moves[planted, ],
+                      ggplot2::aes(colour = steps_lab, shape = steps_lab),
+                      size = 2.5) +
+  ggplot2::scale_fill_manual(name = NULL, values = c("Where the filter acts" = "#E69F00")) +
+  ggplot2::scale_colour_manual(name = NULL, values = mark_col) +
+  ggplot2::scale_shape_manual(name = NULL, values = mark_shape) +
+  ggplot2::scale_y_log10(breaks = ticks,
+                         labels = format(ticks, scientific = FALSE,
+                                         drop0trailing = TRUE)) +
+  ggplot2::expand_limits(x = 0) +
+  ggplot2::labs(x = "Distance between stations (m)",
+                y = "Speed of the step (m/s)") +
+  theme_positionr() +
+  ggplot2::theme(legend.position = "bottom")
+```
+
+Only the planted detection leaves the cloud of real steps (Figure 5). The filter removes one end of
+each violating step:
+
+```{r filter-speed}
+# Remove one end of each violating step
+dets <- filter_speed(dets, max_speed_ms = max_speed, min_dist_m = min_dist)
+# Print the log record, and the removals by reason
+speed_log <- detset_log(dets)
+tail(speed_log[, c("step", "rows_before", "rows_after", "removed")], 1)
+speed_log$removed_by[[nrow(speed_log)]]
+# Test whether the planted detection is still in the set
+any(dets$detections$datetime == false_row$datetime &
+      dets$detections$station_id == false_row$station_id)
+```
+
+The last line confirms that the detection removed was the planted one. The log calls it a `spike`,
+a detection with a violating step on each side. Where one step alone violates, the filter removes
+the end with fewer detections of the animal nearby (`weaker_endpoint`).
+
+### Isolated detections: the minimum lag
+
+The minimum lag of a detection is the shorter of the times to the previous and the next detection
+of its transmitter on its receiver. A false detection, made when two transmissions collide, is
+rarely followed by the same code soon after, so `filter_min_lag()` removes detections whose
+minimum lag exceeds a threshold, and those with no lag at all. Following Pincock (2012), the
+threshold is 30 times the average delay of the tags. Pincock's full test also asks for more short
+intervals than long ones (over 720 times the delay), which `filter_min_lag()` applies only when
+specified (below). `minimum_lags()` returns the lag the filter tests, and changes no data.
+
+```{r lag-explore, fig.height = 4, fig.alt = "Histogram of the minimum lag of each detection on a log scale, with a dashed line at the threshold of 4,500 s.", fig.cap = sprintf("**Figure 6.** Minimum lag of the %s detections that have one, of the %s in the set after the speed filter. Dashed line: the threshold, %s s, 30 times the average delay of the tags.", big(sum(!is.na(lags))), big(length(lags)), big(max_lag))}
+# Set the threshold: 30 times the average delay, the mean of each tag's
+# minimum and maximum delay
+max_lag <- 30 * mean((animals$min_delay + animals$max_delay) / 2)
+max_lag
+# Compute the minimum lag of every detection, in seconds; NA for a
+# detection that is the only one of its transmitter on its receiver
+lags <- minimum_lags(dets)
+# Count the detections the threshold would remove: a lag above it, or none
+c(above_threshold = sum(lags > max_lag, na.rm = TRUE),
+  no_lag = sum(is.na(lags)))
+# Give the share of lags under 1,000 s, in per cent
+round(100 * mean(lags < 1000, na.rm = TRUE))
+# Draw a histogram of the lags with the threshold on it
+ggplot2::ggplot(data.frame(lag_s = lags[!is.na(lags)]),
+                ggplot2::aes(lag_s)) +
+  ggplot2::geom_histogram(bins = 40, fill = "#31688E", colour = "white") +
+  ggplot2::geom_vline(xintercept = max_lag, linetype = 2) +
+  ggplot2::scale_x_log10(labels = scales::label_comma()) +
+  ggplot2::scale_y_sqrt() +
+  ggplot2::labs(x = "Minimum lag (s, log scale)",
+                y = "Detections (square-root scale)") +
+  theme_positionr()
+```
+
+The tallest bars lie between the tags' delays of 120 and 180 s, as a tag heard on every
+transmission gives, and `r round(100 * mean(lags < 1000, na.rm = TRUE))`% of the lags are under
+1,000 s. The detections right of the threshold, and those with no lag, are the ones
+`filter_min_lag()` removes:
+
+```{r filter-min-lag}
+# Keep the set before the filter, to compare the two forms of the test
+before_lag <- dets
+# Remove detections isolated in time beyond the threshold, or alone
+dets <- filter_min_lag(dets, max_lag_s = max_lag)
+tail(detset_log(dets)[, c("step", "rows_before", "rows_after", "removed")], 1)
+```
+
+Pincock's second condition, more short intervals than long ones, is off by default. `long_lag_s`
+adds it, with long meaning over 720 times the average delay, 24 times `max_lag`. The intervals are
+counted for each transmitter on each receiver over the whole set, and a pair that fails loses
+every detection, including those in close pairs. Where every gap between visits is long, a code
+heard only in close pairs passes however rare: four close pairs give 4 short intervals and 3 long.
+Each lone detection between the pairs adds a long interval, and one is enough to make a tie, which
+fails.
+
+```{r filter-min-lag-long}
+# Apply both conditions to the set before the filter: long intervals are
+# over 24 times max_lag, 720 times the average delay
+dets_both_conditions <- filter_min_lag(before_lag, max_lag_s = max_lag,
+                                       long_lag_s = 24 * max_lag)
+# Print the log record of the step
+writeLines(strwrap(tail(detset_log(dets_both_conditions)$reason, 1),
+                   width = 72))
+```
+
+```{r lag-pairs, include = FALSE, purl = FALSE}
+n_fail_pairs <- as.integer(sub(
+  "^.*; ([0-9,]+) of [0-9,]+ transmitter and receiver pairs? had.*$", "\\1",
+  tail(detset_log(dets_both_conditions)$reason, 1)
+))
+stopifnot(nrow(dets_both_conditions$detections) == nrow(dets$detections))
+```
+
+Here the `r nw(n_fail_pairs)` pairs that fail hold only detections the first condition already
+removed, so both forms keep the same `r big(nrow(dets$detections))` detections. The rest of this
+page uses the first condition alone.
+
+### Animals and species
+
+`filter_min_detections()` removes every detection of an animal heard fewer than
+`min_detections` times or on fewer than `min_days` days, as after a tag fails soon after release.
+
+```{r filter-min-detections}
+# Remove animals heard under 10 times or on under 2 days
+dets <- filter_min_detections(dets, min_detections = 10, min_days = 2)
+tail(detset_log(dets)[, c("step", "rows_before", "rows_after", "removed")], 1)
+```
+
+`filter_animals()` keeps one species, or named animals. Run it after `check_detset()` and
+`audit_listening()`, which read every transmitter the receivers logged, and give `transmitters` to
+keep your reference tags.
+
+```{r filter-animals}
+# Keep the walleye only
+dets <- filter_animals(dets, species = "walleye")
+tail(detset_log(dets)[, c("step", "rows_before", "rows_after", "removed")], 1)
+```
+
+Every animal here passes both.
+
+### The filtered dataset
+
+`summarise_animals()` gives one row per animal.
+
+```{r summarise-animals}
+# Summarise each animal in one row
+summarise_animals(dets)[, c("animal_id", "detections", "days", "stations",
+                            "days_at_liberty")]
+```
+
+`summarise_detections()` counts detections by animal, station, receiver or day; here by station.
+
+```{r summarise-detections}
+# Count detections by station, and show the first four
+head(summarise_detections(dets, by = "station"), 4)
+```
+
+`residency_index()` gives, for each animal at each station, the share of the days the station's
+receiver listened on which it heard the animal; here ST-02's.
+
+```{r residency}
+# Show the residency of ST-02 at each station
+station_residency <- residency_index(dets, by = "station")
+station_residency[station_residency$animal_id == "ST-02", ]
+```
+
+`validate_detset()` checks that the tables of a set still follow the table contract after you
+edit them by hand, and stops at the first column that does not. Here the times are turned into
+text:
+
+```{r validate}
+# Turn the times into text and validate
+broken <- dets
+broken$detections$datetime <- format(broken$detections$datetime)
+try(validate_detset(broken))
+```
+
+## Next
+
+[Mortality filtering: base algorithm and review cards](mortality-review.html) reviews the record
+ST-02 leaves. The code of this page is also a plain R script:
+`system.file("scripts", "reading-files.R", package = "detqc")`.
+
+## References
+
+Pincock, D. G. (2012). False detections: what they are and how to remove them from detection
+data. Application note DOC-004691-03. Amirix Systems Inc. (VEMCO).

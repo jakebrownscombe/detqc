@@ -1,0 +1,6 @@
+"collectioncode","seriescode","ocean","station_name","station_type","stn_lat","stn_long","stationstatus","locality","model","instrumenttype","deploy_date","last_download","recovery_date","downloads","off_set"
+"SYN","SYNGlobal","LAKE","SYN001","Acoustic",45,-78,"active","Synthetic lake","VR2W","rcvr","2024-01-01","2024-01-21","2024-01-21",1,0
+"SYN","SYNGlobal","LAKE","SYN001","Acoustic",45,-78,"active","Synthetic lake","VR2W","rcvr","2024-01-21","2024-01-31","2024-01-31",1,0
+"SYN","SYNGlobal","LAKE","SYN002","Acoustic",45.01,-78.01,"active","Synthetic lake","VR2W","rcvr","2024-01-01","2024-01-11","2024-01-21",1,0
+"SYN","SYNGlobal","LAKE","SYN003","Acoustic",45.02,-78.02,"active","Synthetic lake","VR2W","rcvr","2024-01-01","","failed",0,0
+"SYN","SYNGlobal","LAKE","SYN004","Acoustic",45.03,-78.03,"active","Synthetic lake","VR2W","rcvr","2024-01-05","2024-01-25","2024-01-25",1,0

@@ -1,0 +1,55 @@
+Package: detqc
+Title: Quality Control and Mortality Review for Telemetry Detections
+Version: 0.1.0
+Authors@R: c(
+    person("Jacob", "Brownscombe", , "jakebrownscombe@gmail.com", role = c("aut", "cre", "cph"),
+           comment = c(ORCID = "0000-0003-2496-8764")),
+    person("Paul", "Bzonek", role = "ctb",
+           comment = "example data from positionRtools")
+  )
+Description: Reads acoustic telemetry detections and receiver deployments from
+    network and manufacturer exports into tables with fixed column names, checks
+    them for data-entry errors, and applies the filters a user selects, logging
+    every removed row with its reason. Candidate mortalities are flagged by
+    rules and decided by a person on static review pages, and every step is
+    recorded in a processing report.
+License: GPL (>= 3)
+URL: https://jakebrownscombe.github.io/detqc/, https://github.com/jakebrownscombe/detqc
+BugReports: https://github.com/jakebrownscombe/detqc/issues
+Depends:
+    R (>= 4.1.0)
+Imports:
+    data.table,
+    ggplot2 (>= 3.5.0),
+    grid,
+    jsonlite,
+    lubridate,
+    parallel,
+    stats,
+    tools,
+    utils
+Suggests:
+    actel,
+    arrow,
+    detfield,
+    ggrepel,
+    glatos (>= 0.9.8),
+    knitr,
+    readxl,
+    rmarkdown,
+    scales,
+    sf,
+    terra,
+    testthat (>= 3.1.7),
+    withr
+Remotes:
+    jakebrownscombe/detfield
+VignetteBuilder: knitr
+Additional_repositories: https://ocean-tracking-network.r-universe.dev
+Config/testthat/edition: 3
+Config/positionR/tarball_limit: 2500000
+Encoding: UTF-8
+LazyData: true
+Language: en-GB
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.1

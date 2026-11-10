@@ -1,0 +1,67 @@
+format,target,source,sep,type,tz,note
+otn,animal_id,animal_id,,character,,OTN tagging sheet
+otn,animal_id,release_reference_id,,character,,OTN AAT tag release file
+otn,transmitter,tag_code_space;tag_id_code,-,character,,
+otn,transmitter,tag_device_id,,character,,
+otn,release_datetime,utc_release_date_time,,datetime,UTC,
+otn,release_datetime,time,,datetime,UTC,
+otn,release_lat,release_latitude,,numeric,,
+otn,release_lat,latitude,,numeric,,
+otn,release_lon,release_longitude,,numeric,,
+otn,release_lon,longitude,,numeric,,
+otn,tag_model,tag_model,,character,,
+otn,tag_serial,tag_serial_number,,character,,
+otn,tag_life_days,est_tag_life,,numeric,,"text such as ""3650 days"" keeps its number"
+otn,species,common_name_e,,character,,
+otn,length,length,,numeric,,
+otn,weight,weight,,numeric,,
+otn,sex,sex,,character,,
+glatos,animal_id,animal_id,,character,,GLATOS detection export or tagging sheet
+glatos,transmitter,transmitter_codespace;transmitter_id,-,character,,
+glatos,transmitter,tag_code_space;tag_id_code,-,character,,
+glatos,release_datetime,utc_release_date_time,,datetime,UTC,
+glatos,release_datetime,glatos_release_date_time_utc,,datetime,UTC,GLATOS workbook: local glatos_release_date_time at glatos_timezone; the reader converts it
+glatos,release_lat,release_latitude,,numeric,,
+glatos,release_lon,release_longitude,,numeric,,
+glatos,tag_model,tag_model,,character,,
+glatos,tag_serial,tag_serial_number,,character,,
+glatos,tag_life_days,est_tag_life,,numeric,,GLATOS workbook Tagging sheet
+glatos,species,common_name_e,,character,,
+glatos,length,length,,numeric,,
+glatos,weight,weight,,numeric,,
+glatos,sex,sex,,character,,
+innovasea,transmitter,vue_tag_id,,character,,InnovaSea tag specification sheet (Tag Summary)
+innovasea,transmitter,transmitter,,character,,lab CSV of the same columns
+innovasea,tag_serial,serial_no,,character,,
+innovasea,tag_serial,tag_serial_number,,character,,
+innovasea,tag_model,tag_family,,character,,
+innovasea,tag_model,tag_type,,character,,
+innovasea,tag_life_days,est_tag_life,,numeric,,
+innovasea,tag_life_days,tag_life,,numeric,,
+innovasea,min_delay,step_1_min_delay,,numeric,,seconds; first step of the programme
+innovasea,min_delay,min_delay_sec,,numeric,,
+innovasea,max_delay,step_1_max_delay,,numeric,,
+innovasea,max_delay,max_delay_sec,,numeric,,
+innovasea,power_level,step_1_power,,character,,L or H
+innovasea,sensor_type,sensor_type,,character,,"A, T, P or D, or a word"
+innovasea,sensor_unit,units,,character,,
+innovasea,sensor_slope,slope,,numeric,,
+innovasea,sensor_intercept,intercept,,numeric,,
+detqc,animal_id,animal_id,,character,,"detqc's own column names, as write.csv() writes a detqc table"
+detqc,transmitter,transmitter,,character,,
+detqc,species,species,,character,,
+detqc,release_datetime,release_datetime,,datetime,,
+detqc,release_lat,release_lat,,numeric,,
+detqc,release_lon,release_lon,,numeric,,
+detqc,tag_model,tag_model,,character,,
+detqc,tag_serial,tag_serial,,character,,
+detqc,tag_life_days,tag_life_days,,numeric,,
+detqc,min_delay,min_delay,,numeric,,
+detqc,max_delay,max_delay,,numeric,,
+detqc,sensor_type,sensor_type,,character,,
+detqc,sensor_unit,sensor_unit,,character,,
+detqc,sensor_slope,sensor_slope,,numeric,,
+detqc,sensor_intercept,sensor_intercept,,numeric,,
+detqc,length,length,,numeric,,
+detqc,weight,weight,,numeric,,
+detqc,sex,sex,,character,,

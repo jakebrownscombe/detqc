@@ -1,0 +1,31 @@
+{
+  "processing_report_first_screen.png": {
+    "script": "exporting.R",
+    "report": "processing_report.html",
+    "values": ["sys:detqc=0.1.0", "meta:epsg=4326", "log:n=10", "log:1:rows_before=3,297", "log:1:step=detset", "log:1:animals_after=4", "log:10:rows_after=1,938", "log:10:animals_after=4", "log:removed_total=1,359", "log:n_removing_steps=3", "log:n_reasons=3", "rm:9:after_death_date=1,210", "rmname:9:after_death_date=after_death_date", "log:9:step=filter_mortality", "pct:9:after_death_date=38.4", "log:9:rows_before=3,148", "rm:6:post_release_window=106", "rmname:6:post_release_window=post_release_window", "log:6:step=filter_post_release", "pct:6:post_release_window=3.2", "log:6:rows_before=3,297", "rm:7:isolated=43", "rmname:7:isolated=isolated", "log:7:step=filter_min_lag", "pct:7:isolated=1.3", "log:7:rows_before=3,191", "chk_n:flag=1", "chk_n:all=29", "chk_n:not run=7", "lst:receiver_days=180", "lst:stations=20", "lsts:listening:days=77", "lsts:listening:status=listening", "lsts:silent:days=103", "lsts:silent:status=silent", "lst:listening=180", "lst:not_listening=0", "mort:band:dead=1", "mort:animals=4", "mort:band:review=3", "calls:n=4", "call:dead_or_shed=1"]
+  },
+  "processing_report_get_started.png": {
+    "script": "detqc.R",
+    "report": "pkgdown/assets/example/processing_report.html",
+    "values": ["sys:detqc=0.1.0", "meta:epsg=4326", "log:n=11", "log:1:rows_before=3,297", "log:1:step=detset", "log:1:animals_after=4", "log:11:rows_after=1,938", "log:11:animals_after=4", "log:removed_total=1,359", "log:n_removing_steps=3", "log:n_reasons=3", "rm:11:after_death_date=1,210", "rmname:11:after_death_date=after_death_date", "log:11:step=filter_mortality", "pct:11:after_death_date=38.4", "log:11:rows_before=3,148", "rm:6:post_release_window=106", "rmname:6:post_release_window=post_release_window", "log:6:step=filter_post_release", "pct:6:post_release_window=3.2", "log:6:rows_before=3,297", "rm:7:isolated=43", "rmname:7:isolated=isolated", "log:7:step=filter_min_lag", "pct:7:isolated=1.3", "log:7:rows_before=3,191", "chk_n:flag=1", "chk_n:all=29", "chk_n:not run=7", "lst:receiver_days=180", "lst:stations=20", "lsts:listening:days=77", "lsts:listening:status=listening", "lsts:silent:days=103", "lsts:silent:status=silent", "lst:listening=180", "lst:not_listening=0", "mort:band:dead=1", "mort:animals=4", "mort:band:review=3", "calls:n=4", "call:dead_or_shed=1"]
+  },
+  "review_card_top.png": {
+    "script": "mortality-review.R",
+    "card": "ST-02",
+    "cursor": "2024-06-05",
+    "window_days": 7
+  },
+  "review_card_panels.png": {
+    "script": "mortality-review.R",
+    "card": "ST-02",
+    "cursor": "2024-06-05",
+    "window_days": 7
+  },
+  "review_card_get_started.png": {
+    "script": "detqc.R",
+    "page": "pkgdown/assets/example/mortality_review/cards",
+    "card": "ST-02",
+    "cursor": "2024-06-05",
+    "window_days": 7
+  }
+}

@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mortality review</title>
+<!-- Mortality review index from the detqc R package: every animal grouped by band,
+     with progress per band and a sidebar that follows the scroll. Self-contained:
+     no library, no network. The data block below is written by
+     build_mortality_cards(); nothing else on the page is filled in R. -->
+<style>
+ :root{--alive:#2c7fb8;--review:#d95f02;--dead:#c2202a;--ink:#1a1a1a;--mute:#666;--rule:#e2e2e2;--key:#b9a44a}
+ *{box-sizing:border-box}
+ body{font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+      margin:0;margin-left:280px;padding:16px 22px 60px;color:var(--ink);background:#fff}
+ body.tocoff{margin-left:0}
+ a{color:#12507a}
+ h1{font-size:19px;margin:0 0 4px}
+ .meta{color:#444;max-width:1000px;margin:4px 0 10px}
+ code{background:#f3f3f3;padding:1px 4px;border-radius:3px}
+ .bar{position:sticky;top:0;background:#fff;padding:8px 0;border-bottom:1px solid #ddd;z-index:5}
+ .bar input[type=search]{padding:5px 8px;width:260px;font-size:13px}
+ button{padding:4px 9px;font:12px inherit;cursor:pointer;margin-left:4px}
+ h2.bandhead{font-size:16px;margin:24px 0 8px;padding:6px 0 5px;border-bottom:2px solid var(--key);scroll-margin-top:52px}
+ h2.bandhead span{font-weight:400;color:var(--mute);font-size:13px}
+ table{border-collapse:collapse;width:100%}
+ th,td{border-bottom:1px solid #e6e6e6;padding:3px 3px;vertical-align:middle;text-align:left;font-size:12px}
+ td.d{white-space:nowrap;font-variant-numeric:tabular-nums}
+ /* The table fits a 1,300 px window beside the sidebar. A wider table scrolls in its own box, so the page never scrolls sideways. */
+ td.rule{min-width:80px;max-width:140px}
+ #tables{overflow-x:auto}
+ td.sensor{max-width:150px}
+ th{background:#f4f4f4;cursor:pointer;user-select:none;font-size:11px}
+ th.asc:after{content:" \2191"} th.desc:after{content:" \2193"}
+ td.n{text-align:right;font-variant-numeric:tabular-nums}
+ td.id{font-weight:600;white-space:nowrap}
+ tr{scroll-margin-top:52px}
+ tr.done{background:#f2fbf2}
+ tr.cur td.id{box-shadow:inset 3px 0 0 var(--key)}
+ .pill{padding:1px 7px;border-radius:9px;font-size:11px;font-weight:700;color:#fff;white-space:nowrap}
+ .pill.alive{background:var(--alive)} .pill.review{background:var(--review)} .pill.dead{background:var(--dead)}
+ select.call,input.note,input.dd{font-size:12px;padding:2px}
+ input.note{width:56px}
+ input.dd{width:112px}
+ #toc{position:fixed;top:0;left:0;width:280px;height:100vh;background:#fff;border-right:2px solid var(--key);
+      z-index:20;display:flex;flex-direction:column}
+ body.tocoff #toc{display:none}
+ #tocpeek{display:none;position:fixed;left:0;top:40%;z-index:21;background:var(--key);color:#fff;border:none;
+   border-radius:0 8px 8px 0;padding:14px 6px;cursor:pointer;font-weight:700;writing-mode:vertical-rl;font-size:11px}
+ body.tocoff #tocpeek{display:block}
+ #toc .tochead{padding:9px 11px;border-bottom:1px solid var(--rule);display:flex;gap:7px;align-items:center}
+ #toclist{flex:1;overflow-y:auto;font-size:12px}
+ #toclist .grp{position:sticky;top:0;background:#f4f1e2;border-top:1px solid var(--key);border-bottom:1px solid var(--key);
+   padding:4px 9px;font-weight:700;font-size:11px;color:#6b5c18;cursor:pointer;display:flex;justify-content:space-between;z-index:2}
+ #toclist .grp.cur{background:#efe6b8}
+ #toclist .row{display:flex;gap:6px;align-items:center;padding:4px 9px;cursor:pointer;border-bottom:1px solid #f4f4f4;
+   border-left:3px solid transparent}
+ #toclist .row:hover{background:#f5f9ff}
+ #toclist .row.cur{background:#fffbe8;border-left:3px solid var(--key)}
+ #toclist .fid{font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ #toclist .mine{font-weight:700;width:40px;font-size:10px;text-align:right}
+ #toc .tocfoot{padding:8px 11px;border-top:1px solid var(--rule);font-size:11px;color:#555}
+ #toc .tocfoot button{margin:4px 0 0;width:100%}
+ #tocfoot .bandct{display:block;color:#666}
+ /* Up to 1,500 px the sidebar narrows, so the table keeps its columns on screen. */
+ @media (max-width: 1500px){
+   body{margin-left:200px;padding-left:16px;padding-right:16px}
+   #toc{width:200px}
+ }
+ /* A phone has no room for the sidebar beside the tables: it opens over them. */
+ @media (max-width: 760px){
+   body{margin-left:0;padding:8px}
+   #toc{width:85vw;box-shadow:2px 0 8px rgba(0,0,0,0.25)}
+   #tables{overflow-x:auto}
+ }
+</style></head><body>
+<nav id="toc">
+ <div class="tochead"><b>Bands</b><button id="tocclose" title="key: C">hide</button></div>
+ <div id="toclist"></div>
+ <div class="tocfoot"><span id="tocfoot"></span>
+  <button id="tocexport" title="download every call, death date and note as one CSV">Export my calls (CSV)</button>
+  <button id="tocimport" title="restore calls from a CSV this page or a card exported">Import calls (CSV)</button>
+  <input type="file" id="importfile" accept=".csv,text/csv" style="display:none">
+  <button id="tocclear" title="delete every call stored in this browser">Clear my calls</button>
+ </div>
+</nav>
+<button id="tocpeek" title="key: C">BANDS</button>
+<h1 id="h1"></h1>
+<p class="meta" id="lede"></p>
+<p class="meta" id="rules"></p>
+<div class="bar">
+ <input type="search" id="q" placeholder="filter: id, species, band, rule, call">
+ <button id="only">show animals without a call</button>
+ <button id="resume">resume review (first animal without a call)</button>
+ <span id="count" style="margin-left:12px;color:#555"></span>
+</div>
+<div id="tables"></div>
+<p class="meta" id="built"></p>
+
+<script id="detqc-data" type="application/json">{"title":"Mortality review","store":"detqc_calls_mortality_review_3b154fb7f2","rows":[{"id":"ST-02","slug":"ST-02","sp":"walleye","b":"dead","rank":1,"pers":null,"rule":"a final stationary run with no alive vote","card":true,"date":"2024-06-03","time":"2024-06-03T15:05:39Z","ddays":9,"span":9,"dets":1237,"stns":3,"sensor":"depth","first":"2024-06-02","last":"2024-06-10"},{"id":"ST-01","slug":"ST-01","sp":"walleye","b":"review","rank":1,"pers":null,"rule":"a final run at one site apart from stray detections on a few days","card":true,"date":"2024-06-08","time":"2024-06-08T00:32:54Z","ddays":9,"span":9,"dets":824,"stns":10,"sensor":"none","first":"2024-06-02","last":"2024-06-10"},{"id":"ST-03","slug":"ST-03","sp":"walleye","b":"review","rank":2,"pers":null,"rule":"a record that ends near tag life or the data horizon","card":true,"date":"","time":"","ddays":8,"span":8,"dets":418,"stns":8,"sensor":"depth","first":"2024-06-02","last":"2024-06-09"},{"id":"ST-04","slug":"ST-04","sp":"walleye","b":"review","rank":3,"pers":null,"rule":"a record that ends near tag life or the data horizon","card":true,"date":"","time":"","ddays":9,"span":9,"dets":669,"stns":10,"sensor":"none","first":"2024-06-02","last":"2024-06-10"}],"bands":[{"k":"dead","label":"Dead band","n":1},{"k":"review","label":"Review band","n":3},{"k":"alive","label":"Alive band","n":0}],"ranked":false,"lede":"4 animals from the detset (detqc 0.1.0; detset of 3,148 detections). Bands: dead 1, review 3, alive 0 (denominator: animals with at least one detection; 0 of them have no located detection). 4 have a review card. The band is a triage from the rule streams; the call you make here or on a card is the verdict. A dead/shed call takes the candidate date unless you set another. Calls live in this browser under the key detqc_calls_mortality_review_3b154fb7f2 and survive a rebuild; export them to CSV for apply_mortality_calls().","streams":["depth","record end","final run"],"built":"Built 2026-11-09 16:04 UTC by detqc 0.1.0.","detset_key":"6906359ac1","cards_for":["dead","review","alive"]}</script>
+<script id="detqc-index">
+var P = JSON.parse(document.getElementById("detqc-data").textContent);
+var STORE = P.store;
+var CALLCOL = {alive:"#2c7fb8", dead_or_shed:"#c2202a", uncertain:"#8a8a8a"};
+var ABBR = {alive:"ALIVE", dead_or_shed:"D/S", uncertain:"UNC"};
+function esc(s){ return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;")
+  .replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function fmtN(x){ return x == null ? "" : String(x).replace(/\B(?=(\d{3})+(?!\d))/g,","); }
+function ann(){ try { return JSON.parse(localStorage.getItem(STORE) || "{}"); } catch(e){ return {}; } }
+function save(a){ localStorage.setItem(STORE, JSON.stringify(a)); }
+
+document.getElementById("h1").textContent = P.title;
+document.getElementById("lede").innerHTML = esc(P.lede);
+document.getElementById("rules").textContent = "Rule streams that voted dead, alive or review on at least one animal: " +
+  (P.streams.length ? P.streams.join(", ") : "none") +
+  ". Each card shows every stream's vote, including no vote, and the date it points to." +
+  (P.ranked ? " The review band is ordered by the persistence score, highest first; rank counts within the band." :
+   " Rank counts within the band.");
+document.getElementById("built").textContent = P.built;
+
+/* ---- tables, one per band ---- */
+function fmtP(x){ return x == null ? "" : Number(x).toFixed(2); }
+/* One entry per column: its head, its sort type, and its cell. The
+   persistence column is left out when no animal has a score. */
+var COLS = [
+  ["rank","n",function(r){ return '<td class="n">' + r.rank + '</td>'; }],
+  ["animal","s",function(r, link){ return '<td class="id">' + link + '</td>'; }],
+  ["species","s",function(r){ return '<td>' + esc(r.sp) + '</td>'; }],
+  ["deciding rule","s",function(r){ return '<td class="rule">' + esc(r.rule) + '</td>'; }],
+  ["candidate date","s",function(r){ return '<td class="d">' + esc(r.date) + '</td>'; }],
+  ["persistence","n",function(r){ return '<td class="n">' + fmtP(r.pers) + '</td>'; }],
+  ["detection days","n",function(r){ return '<td class="n">' + fmtN(r.ddays) + '</td>'; }],
+  ["span days","n",function(r){ return '<td class="n">' + fmtN(r.span) + '</td>'; }],
+  ["detections","n",function(r){ return '<td class="n">' + fmtN(r.dets) + '</td>'; }],
+  ["stations","n",function(r){ return '<td class="n">' + fmtN(r.stns) + '</td>'; }],
+  ["sensors","s",function(r){ return '<td class="sensor">' + esc(r.sensor) + '</td>'; }],
+  ["first","s",function(r){ return '<td class="d">' + esc(r.first) + '</td>'; }],
+  ["last","s",function(r){ return '<td class="d">' + esc(r.last) + '</td>'; }],
+  ["my call","s",function(){ return '<td><select class="call"><option value=""></option>' +
+    '<option value="alive">alive</option><option value="dead_or_shed">dead/shed</option>' +
+    '<option value="uncertain">uncertain</option></select></td>'; }],
+  ["death date","s",function(){ return '<td><input class="dd" type="date" title="death date of a ' +
+    'dead/shed call; it defaults to the candidate date"></td>'; }],
+  ["note","s",function(){ return '<td><input class="note" type="text" placeholder="note"></td>'; }]
+];
+if (P.rows.every(function(r){ return r.pers == null; })) {
+  COLS = COLS.filter(function(c){ return c[0] !== "persistence"; });
+}
+(function build(){
+  var html = [];
+  P.bands.forEach(function(bd){
+    var rows = P.rows.filter(function(r){ return r.b === bd.k; });
+    html.push('<h2 class="bandhead" id="band-' + bd.k + '">' + esc(bd.label) + ' <span>(' + rows.length +
+              ' animals)</span></h2>');
+    if (!rows.length){ html.push('<p class="meta">No animals in this band.</p>'); return; }
+    html.push('<table data-band="' + bd.k + '"><thead><tr>' + COLS.map(function(c){
+      return '<th data-type="' + c[1] + '">' + c[0] + '</th>'; }).join("") + '</tr></thead><tbody>');
+    rows.forEach(function(r, k){
+      var link = r.card ? '<a href="cards/' + esc(r.slug) + '.html">' + esc(r.id) + '</a>' : esc(r.id);
+      html.push('<tr id="row-' + esc(r.slug) + '" data-id="' + esc(r.id) + '" data-band="' + r.b +
+        '" data-cand="' + esc(r.date) + '" data-candtime="' + esc(r.time || "") + '">' +
+        COLS.map(function(c){ return c[2](r, link); }).join("") + '</tr>');
+    });
+    html.push('</tbody></table>');
+  });
+  document.getElementById("tables").innerHTML = html.join("");
+})();
+var allRows = [].slice.call(document.querySelectorAll("#tables tbody tr"));
+
+function paint(){
+  var a = ann(), n = 0, per = {};
+  P.bands.forEach(function(bd){ per[bd.k] = 0; });
+  allRows.forEach(function(r){
+    var v = a[r.dataset.id] || {};
+    r.querySelector("select.call").value = v.call || "";
+    if (document.activeElement !== r.querySelector("input.note")) r.querySelector("input.note").value = v.note || "";
+    if (document.activeElement !== r.querySelector("input.dd")) r.querySelector("input.dd").value = v.death_date || "";
+    if (v.call){ r.classList.add("done"); n++; per[r.dataset.band]++; } else r.classList.remove("done");
+  });
+  document.getElementById("count").textContent = n + " of " + allRows.length + " animals called";
+  var foot = '<b>' + n + " of " + allRows.length + " called</b>";
+  P.bands.forEach(function(bd){
+    foot += '<span class="bandct">' + esc(bd.label) + ": " + per[bd.k] + " of " + bd.n + "</span>";
+  });
+  document.getElementById("tocfoot").innerHTML = foot;
+  tocRows();
+}
+
+/* ---- sidebar: one group per band with its own progress ---- */
+function tocRows(){
+  var list = document.getElementById("toclist"), keep = list.scrollTop, a = ann(), out = [];
+  P.bands.forEach(function(bd){
+    var mem = P.rows.filter(function(r){ return r.b === bd.k; });
+    var done = mem.filter(function(r){ return a[r.id] && a[r.id].call; }).length;
+    out.push('<div class="grp" data-band="' + bd.k + '"><span>' + esc(bd.label) + ' (' + bd.n + ')</span><span>' +
+             done + '/' + bd.n + ' called</span></div>');
+    mem.forEach(function(r){
+      var m = a[r.id] || {};
+      var mc = m.call ? '<span class="mine" style="color:' + (CALLCOL[m.call]||"#555") + '">' + (ABBR[m.call]||"?") + '</span>'
+                      : '<span class="mine" style="color:#ccc">&mdash;</span>';
+      out.push('<div class="row" data-slug="' + esc(r.slug) + '"><span class="fid">' + esc(r.id) + '</span>' + mc + '</div>');
+    });
+  });
+  list.innerHTML = out.join("");
+  list.scrollTop = keep;
+  markCurrent();
+}
+
+/* ---- scroll-spy: the current row is the last whose top has passed the
+   trigger line; its band header and sidebar row are marked. ---- */
+var TRIGGER = 90;
+function markCurrent(){
+  var cur = null;
+  for (var k = 0; k < allRows.length; k++){
+    if (allRows[k].style.display === "none") continue;
+    if (allRows[k].getBoundingClientRect().top <= TRIGGER) cur = allRows[k]; else if (cur) break;
+  }
+  var shown = allRows.filter(function(r){ return r.style.display !== "none"; });
+  if (!cur) cur = shown[0] || null;
+  /* At the foot of the page the last rows cannot reach the trigger line. */
+  if (shown.length && window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2)
+    cur = shown[shown.length - 1];
+  allRows.forEach(function(r){ r.classList.toggle("cur", r === cur); });
+  var slug = cur ? cur.id.replace(/^row-/, "") : null, band = cur ? cur.dataset.band : null, seen = null;
+  [].forEach.call(document.querySelectorAll("#toclist .row"), function(r){
+    var on = r.dataset.slug === slug; r.classList.toggle("cur", on); if (on) seen = r; });
+  [].forEach.call(document.querySelectorAll("#toclist .grp"), function(g){ g.classList.toggle("cur", g.dataset.band === band); });
+  if (seen){
+    var lb = document.getElementById("toclist").getBoundingClientRect(), rb = seen.getBoundingClientRect();
+    if (rb.top < lb.top + 24 || rb.bottom > lb.bottom) seen.scrollIntoView({block:"nearest"});
+  }
+}
+var ticking = false;
+window.addEventListener("scroll", function(){
+  if (ticking) return; ticking = true;
+  window.requestAnimationFrame(function(){ markCurrent(); ticking = false; });
+});
+document.getElementById("toclist").addEventListener("click", function(e){
+  var g = e.target.closest(".grp");
+  if (g){ var h = document.getElementById("band-" + g.dataset.band); if (h) h.scrollIntoView({block:"start"}); return; }
+  var r = e.target.closest(".row");
+  if (r){ var t = document.getElementById("row-" + r.dataset.slug); if (t) t.scrollIntoView({block:"start"}); }
+});
+
+/* ---- calls ---- */
+/* A dead/shed call made here takes the date typed in the row, else the date
+   already stored, else the row's candidate date. */
+function store(row){
+  var a = ann(), id = row.dataset.id, old = a[id] || {};
+  var call = row.querySelector("select.call").value, note = row.querySelector("input.note").value;
+  var typed = row.querySelector("input.dd").value;
+  var dd = typed || old.death_date || "";
+  if (call === "dead_or_shed" && !dd) dd = row.dataset.cand || "";
+  if (call === "alive") dd = "";
+  if (!call && !note && !dd){ delete a[id]; }
+  else {
+    var src = typed && typed !== old.death_date ? "typed" : (dd && dd === row.dataset.cand ? "candidate" : (old.death_src || ""));
+    /* A call on the candidate date keeps the candidate's time; the filter cuts there. */
+    a[id] = {call: call, note: note, band: row.dataset.band, at: new Date().toISOString(), death_date: dd,
+             death_src: src, death_time: src === "candidate" ? (row.dataset.candtime || "") : ""};
+  }
+  save(a); paint();
+}
+document.addEventListener("change", function(e){
+  if (e.target.matches("select.call, input.note, input.dd")) store(e.target.closest("tr"));
+});
+
+/* ---- sorting within a band ---- */
+document.querySelectorAll("#tables table").forEach(function(tbl){
+  var ths = tbl.tHead.rows[0].cells, tb = tbl.tBodies[0];
+  [].forEach.call(ths, function(th, i){ th.addEventListener("click", function(){
+    var dir = th.classList.contains("asc") ? -1 : 1;
+    [].forEach.call(ths, function(o){ o.classList.remove("asc","desc"); });
+    th.classList.add(dir === 1 ? "asc" : "desc");
+    var num = th.dataset.type === "n";
+    [].slice.call(tb.rows).sort(function(x, y){
+      var a = x.cells[i].textContent.trim(), b = y.cells[i].textContent.trim();
+      if (num){ var fa = parseFloat(a.replace(/,/g,"")), fb = parseFloat(b.replace(/,/g,""));
+        if (isNaN(fa) && isNaN(fb)) return 0; if (isNaN(fa)) return 1; if (isNaN(fb)) return -1;
+        return (fa - fb) * dir; }
+      return a.localeCompare(b) * dir;
+    }).forEach(function(r){ tb.appendChild(r); });
+  }); });
+});
+
+/* ---- filter, unannotated, resume ---- */
+var onlyOn = false;
+function applyFilter(){
+  var v = document.getElementById("q").value.toLowerCase(), a = ann();
+  allRows.forEach(function(r){
+    var m = a[r.dataset.id] || {};
+    var hit = (r.textContent + " " + r.dataset.band + " " + (m.call || "") + " " + (m.note || "")).toLowerCase().indexOf(v) > -1;
+    r.style.display = hit && !(onlyOn && m.call) ? "" : "none";
+  });
+  markCurrent();
+}
+document.getElementById("q").addEventListener("input", applyFilter);
+document.getElementById("only").addEventListener("click", function(){
+  onlyOn = !onlyOn; this.textContent = onlyOn ? "show all" : "show animals without a call"; applyFilter();
+});
+document.getElementById("resume").addEventListener("click", function(){
+  var a = ann();
+  for (var k = 0; k < P.rows.length; k++){
+    var r = P.rows[k];
+    if (a[r.id] && a[r.id].call) continue;
+    if (r.card){ location.href = "cards/" + r.slug + ".html"; return; }
+  }
+  alert("Every animal with a card already has a call.");
+});
+
+/* ---- export and import ---- */
+function csvCell(v){ return '"' + String(v == null ? "" : v).replace(/"/g,'""') + '"'; }
+function exportCsv(){
+  var a = ann(), out = ["animal_id,band,call,death_date,death_time,date_source,note,annotated_at,candidate_date"];
+  P.rows.forEach(function(r){
+    var v = a[r.id];
+    if (v && (v.call || v.note)) out.push([r.id, r.b, v.call, v.death_date, v.death_time || "", v.death_src, v.note, v.at, r.date].map(csvCell).join(","));
+  });
+  var text = out.join("\n") + "\n";
+  var b = new Blob([text], {type:"text/csv"}), u = URL.createObjectURL(b), l = document.createElement("a");
+  l.href = u; l.download = "mortality_calls_" + new Date().toISOString().slice(0,10) + ".csv";
+  document.body.appendChild(l); l.click(); l.remove();
+  return text;
+}
+function parseCsv(text){
+  var rows = [], row = [], cell = "", q = false;
+  for (var i = 0; i < text.length; i++){
+    var ch = text[i];
+    if (q){ if (ch === '"'){ if (text[i+1] === '"'){ cell += '"'; i++; } else q = false; } else cell += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === ","){ row.push(cell); cell = ""; }
+    else if (ch === "\n" || ch === "\r"){ if (ch === "\r" && text[i+1] === "\n") i++; row.push(cell); rows.push(row); row = []; cell = ""; }
+    else cell += ch;
+  }
+  if (cell.length || row.length){ row.push(cell); rows.push(row); }
+  return rows.filter(function(r){ return r.length > 1 || r[0] !== ""; });
+}
+function importCsv(text){
+  var rows = parseCsv(text), h = rows.shift() || [], a = ann(), n = 0, known = {};
+  P.rows.forEach(function(r){ known[r.id] = r.b; });
+  var ix = function(name){ return h.indexOf(name); };
+  if (ix("animal_id") < 0 || ix("call") < 0) { alert("The file needs animal_id and call columns."); return 0; }
+  rows.forEach(function(r){
+    var id = r[ix("animal_id")];
+    if (!(id in known)) return;
+    a[id] = {call: r[ix("call")] || "", death_date: ix("death_date") >= 0 ? r[ix("death_date")] : "",
+             death_time: ix("death_time") >= 0 ? r[ix("death_time")] : "",
+             death_src: ix("date_source") >= 0 ? r[ix("date_source")] : "",
+             note: ix("note") >= 0 ? r[ix("note")] : "", band: known[id],
+             at: ix("annotated_at") >= 0 && r[ix("annotated_at")] ? r[ix("annotated_at")] : new Date().toISOString()};
+    n++;
+  });
+  save(a); paint(); return n;
+}
+document.getElementById("tocexport").addEventListener("click", exportCsv);
+document.getElementById("tocimport").addEventListener("click", function(){ document.getElementById("importfile").click(); });
+document.getElementById("importfile").addEventListener("change", function(){
+  var f = this.files[0]; if (!f) return;
+  var rd = new FileReader();
+  rd.onload = function(){ var n = importCsv(String(rd.result)); alert(n + " calls restored."); };
+  rd.readAsText(f);
+});
+document.getElementById("tocclear").addEventListener("click", function(){
+  /* Only the animals of this review: another review may share the store. */
+  if (confirm("Delete every call stored in this browser for the animals of this review?")){
+    var a = ann();
+    P.rows.forEach(function(r){ delete a[r.id]; });
+    if (Object.keys(a).length) save(a); else localStorage.removeItem(STORE);
+    paint();
+  }
+});
+function tocToggle(force){
+  var off = force != null ? !force : !document.body.classList.contains("tocoff");
+  document.body.classList.toggle("tocoff", off);
+  localStorage.setItem(STORE + "_toc_hidden", off ? "1" : "0");
+}
+document.getElementById("tocclose").addEventListener("click", function(){ tocToggle(false); });
+document.getElementById("tocpeek").addEventListener("click", function(){ tocToggle(true); });
+document.addEventListener("keydown", function(e){
+  if (e.target.matches("input, select, textarea")) return;
+  if (e.key === "c" || e.key === "C") tocToggle();
+});
+
+if (window.innerWidth < 760 || localStorage.getItem(STORE + "_toc_hidden") === "1") document.body.classList.add("tocoff");
+paint();
+window.__review = {ann: ann, paint: paint, exportCsv: exportCsv, importCsv: importCsv, P: P, markCurrent: markCurrent};
+</script>
+</body></html>

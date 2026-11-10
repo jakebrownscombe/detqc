@@ -1,0 +1,177 @@
+url: https://jakebrownscombe.github.io/detqc/
+
+template:
+  bootstrap: 5
+  bootswatch: cosmo
+  bslib:
+    primary: "#2C5AA0"
+    base_font: {google: "Source Sans 3"}
+    heading_font: {google: "Source Sans 3"}
+    code_font: {google: "Source Code Pro"}
+
+home:
+  title: "detqc: read, check and clean acoustic telemetry detections"
+  # Set explicitly so the site carries no CRAN or rdrr.io link. The sidebar
+  # draws its own Links box, to the suite's sites.
+  links:
+    - text: positionR suite diagram
+      href: reference/figures/concept_suite.png
+  sidebar:
+    structure: [suite_links, license, citation, authors, dev]
+    components:
+      suite_links:
+        title: Links
+        text: >
+          [positionR suite diagram](reference/figures/concept_suite.png)<br>
+          [detfield](https://jakebrownscombe.github.io/detfield/)<br>
+          [arraydesign](https://jakebrownscombe.github.io/arraydesign/)<br>
+          [arraydesignR](https://jakebrownscombe.github.io/arraydesignR/)
+
+navbar:
+  structure:
+    left: [intro, articles, reference, news]
+    right: [suite, search, github]
+  components:
+    intro:
+      text: Get started
+      href: articles/detqc.html
+    suite:
+      text: positionR
+      menu:
+        - text: positionR, the suite
+          href: https://jakebrownscombe.github.io/positionR/
+        - text: detqc, read, check and filter detections
+          href: https://jakebrownscombe.github.io/detqc/
+        - text: detfield, detection fields and positions
+          href: https://jakebrownscombe.github.io/detfield/
+        - text: arraydesign, design and test tracking systems
+          href: https://jakebrownscombe.github.io/arraydesign/
+        - text: arraydesignR, arraydesign as a point-and-click application
+          href: https://jakebrownscombe.github.io/arraydesignR/
+
+articles:
+  - title: Get started
+    navbar: Get started
+    desc: >
+      What detqc does, with the review cards and the processing report, and
+      the Stoney Lake example run once from its files to the report.
+    contents:
+      - detqc
+  - title: Base processing
+    navbar: Base processing
+    desc: >
+      Your own files read into a detection set, every data-entry check run,
+      and the filters your study needs applied with the figure behind each.
+    contents:
+      - reading-files
+  - title: Mortality filtering
+    navbar: Mortality filtering
+    desc: >
+      Every animal flagged by the mortality algorithm and called by you on a
+      review card, with the calls brought back to the set.
+    contents:
+      - mortality-review
+  - title: Export
+    navbar: Export
+    desc: >
+      The cleaned set handed to actel, glatos, the ATO tables or detfield,
+      saved with its log, and the processing report that records every step.
+    contents:
+      - exporting
+
+reference:
+  - title: Read
+    desc: >
+      Read detections, receiver deployments, animal records and tag
+      specification sheets from OTN, GLATOS and InnovaSea files, and join them
+      into one detection set.
+    contents:
+      - read_detections
+      - read_deployments
+      - read_animals
+      - read_tag_specs
+      - read_receiver_logs
+      - column_map
+      - calibrate_sensors
+      - detset
+      - read_detset_from
+  - title: Check and summarise
+    desc: >
+      Find data-entry errors, record which receivers listened, and look at
+      the detections before you remove any.
+    contents:
+      - check_detset
+      - all_checks
+      - check_settings
+      - validate_detset
+      - audit_listening
+      - detset_log
+      - summarise_detections
+      - summarise_animals
+      - residency_index
+  - title: Filter
+    desc: >
+      Each filter is opt-in and writes one line to the processing log.
+    contents:
+      - filter_duplicates
+      - filter_release
+      - filter_post_release
+      - filter_deployment_period
+      - filter_tag_life
+      - filter_min_lag
+      - minimum_lags
+      - filter_min_detections
+      - filter_speed
+      - speed_steps
+      - filter_animals
+  - title: Review mortality
+    desc: >
+      The rules sort animals into dead, review and alive bands. You make
+      each call on a review card, and the calls come back to the set.
+    contents:
+      - detect_mortality
+      - mortality_rules
+      - mortality_rule
+      - review_mortality
+      - build_mortality_cards
+      - apply_mortality_calls
+      - reconcile_mortality
+      - filter_mortality
+  - title: Export
+    desc: >
+      Hand the set to detfield, glatos, actel or the ATO tables, save it with
+      its log, and write the processing report. `read_detset()` is documented
+      with `write_detset()`.
+    contents:
+      - as_detfield_input
+      - to_glatos
+      - to_actel
+      - to_ato
+      - write_detset
+      - processing_report
+  - title: Plot
+    desc: >
+      The figures of a detection set, and the theme, depth scale, probability
+      scale and scale bar positionR maps are drawn with.
+    contents:
+      - plot_receivers
+      - plot_abacus
+      - plot_timeline
+      - plot_attrition
+      - theme_positionr
+      - positionr_ring_colours
+      - scale_fill_depth
+      - scale_fill_probability
+      - annotation_scale_bar
+  - title: Example data
+    desc: >
+      The Stoney Lake study as read, prepared for the mortality rules with
+      the true fate of each animal, and read, checked and filtered. Its files
+      are in `system.file("extdata", package = "detqc")`.
+    contents:
+      - detqc_example
+      - example_mortality
+      - stoney_clean
+
+code:
+  width: 76
