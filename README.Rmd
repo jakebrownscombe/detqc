@@ -24,11 +24,9 @@ nw <- function(n) {
 
 [![License: GPL (>= 3)](https://img.shields.io/badge/license-GPL%20(%3E%3D%203)-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-**detqc** reads acoustic telemetry detections from OTN, GLATOS and InnovaSea exports (VUE and
-Fathom VDAT) into tables with fixed column names. It reads receiver deployments from OTN and
-GLATOS exports, and animals from OTN tagging records and GLATOS workbooks and exports. It
-checks them for data-entry errors, applies the filters you choose and logs every detection it removes, flags
-candidate mortalities for you to call on review cards, and writes the result for the
+**detqc** reads detection files from OTN, GLATOS and InnovaSea (VUE and Fathom VDAT) and tagging
+and receiver deployment files from OTN and GLATOS, runs a range of data checks and filters,
+reviews mortality, and generates a processing report. It writes the result for the
 [**detfield**](https://jakebrownscombe.github.io/detfield/) R package, the
 [**glatos**](https://ocean-tracking-network.github.io/glatos/) and
 [**actel**](https://actel.trackyverse.org/) R packages, or the ATO tables.
@@ -67,16 +65,15 @@ plot_receivers(dets, water = lake) + theme_positionr(base_size = 13)
 ```{r map-counts, include = FALSE}
 stations <- plot_receivers(dets, water = lake)$data
 silent <- stations$detections == 0
-# The caption and the alt text place the silent stations, and the alt text
-# counts six; the knit stops when either changes.
+# The alt text places the silent stations and counts six; the knit stops
+# when either changes.
 stopifnot(sum(silent) == 6,
           all(stations$deploy_lat[silent] > median(stations$deploy_lat)),
           all(stations$deploy_lon[silent] > median(stations$deploy_lon)))
 ```
 
 *The `r nrow(stations)` receiver stations of the example, sized by the detections each heard of the
-four walleye; the `r nw(sum(silent))` stations that heard none all lie north and east of the
-median station latitude and longitude.*
+four walleye; `r nw(sum(silent))` heard none.*
 
 `plot_attrition()` draws what each step removed from `stoney_clean`, the same study filtered.
 
@@ -121,10 +118,8 @@ example study, Stoney Lake.
 - [**arraydesign**](https://jakebrownscombe.github.io/arraydesign/): design and test the performance of tracking systems.
 - [**arraydesignR**](https://jakebrownscombe.github.io/arraydesignR/): **arraydesign** as a point-and-click application.
 
-**detfield** exports the same five figure functions as **detqc**: `theme_positionr()`,
-`scale_fill_depth()`, `scale_fill_probability()`, `annotation_scale_bar()` and
-`positionr_ring_colours()`. With both packages attached, R reports that one masks the other;
-attach one of them, or call the functions with `detqc::` or `detfield::`.
+**detfield** exports the same five figure functions as **detqc**. The copies are identical, so
+the masking message R prints when both are attached can be ignored.
 
 ## Cite
 

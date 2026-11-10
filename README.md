@@ -6,13 +6,10 @@
 [![License: GPL (\>=
 3)](https://img.shields.io/badge/license-GPL%20(%3E%3D%203)-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-**detqc** reads acoustic telemetry detections from OTN, GLATOS and
-InnovaSea exports (VUE and Fathom VDAT) into tables with fixed column
-names. It reads receiver deployments from OTN and GLATOS exports, and
-animals from OTN tagging records and GLATOS workbooks and exports. It
-checks them for data-entry errors, applies the filters you choose and
-logs every detection it removes, flags candidate mortalities for you to
-call on review cards, and writes the result for the
+**detqc** reads detection files from OTN, GLATOS and InnovaSea (VUE and
+Fathom VDAT) and tagging and receiver deployment files from OTN and
+GLATOS, runs a range of data checks and filters, reviews mortality, and
+generates a processing report. It writes the result for the
 [**detfield**](https://jakebrownscombe.github.io/detfield/) R package,
 the [**glatos**](https://ocean-tracking-network.github.io/glatos/) and
 [**actel**](https://actel.trackyverse.org/) R packages, or the ATO
@@ -52,8 +49,7 @@ plot_receivers(dets, water = lake) + theme_positionr(base_size = 13)
 <img src="man/figures/README-map-1.png" alt="Map of Stoney Lake shaded by depth, with the receiver stations as rings sized by detections and labelled by station; six stations, north and east of the station medians, heard no detections and are white rings." width="100%" />
 
 *The 20 receiver stations of the example, sized by the detections each
-heard of the four walleye; the six stations that heard none all lie
-north and east of the median station latitude and longitude.*
+heard of the four walleye; six heard none.*
 
 `plot_attrition()` draws what each step removed from `stoney_clean`, the
 same study filtered.
@@ -101,18 +97,16 @@ column names and one example study, Stoney Lake.
 - [**arraydesignR**](https://jakebrownscombe.github.io/arraydesignR/):
   **arraydesign** as a point-and-click application.
 
-**detfield** exports the same five figure functions as **detqc**:
-`theme_positionr()`, `scale_fill_depth()`, `scale_fill_probability()`,
-`annotation_scale_bar()` and `positionr_ring_colours()`. With both
-packages attached, R reports that one masks the other; attach one of
-them, or call the functions with `detqc::` or `detfield::`.
+**detfield** exports the same five figure functions as **detqc**. The
+copies are identical, so the masking message R prints when both are
+attached can be ignored.
 
 ## Cite
 
-Brownscombe J (2026). positionR: tools for acoustic telemetry studies. R
-package version 2.0.0, <https://jakebrownscombe.github.io/positionR/>.
+Brownscombe JW (2026). positionR: tools for acoustic telemetry studies.
+R package version 2.0.0, <https://jakebrownscombe.github.io/positionR/>.
 
-Brownscombe J (2026). detqc: Quality Control and Mortality Review for
+Brownscombe JW (2026). detqc: Quality Control and Mortality Review for
 Telemetry Detections. R package version 0.1.1.
 <https://jakebrownscombe.github.io/detqc/>
 

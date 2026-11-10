@@ -2,7 +2,7 @@ Package: detqc
 Title: Quality Control and Mortality Review for Telemetry Detections
 Version: 0.1.1
 Authors@R: c(
-    person("Jacob", "Brownscombe", , "jakebrownscombe@gmail.com", role = c("aut", "cre", "cph"),
+    person(c("Jacob", "W."), "Brownscombe", , "jakebrownscombe@gmail.com", role = c("aut", "cre", "cph"),
            comment = c(ORCID = "0000-0003-2496-8764")),
     person("Paul", "Bzonek", role = "ctb",
            comment = "example data from positionRtools")

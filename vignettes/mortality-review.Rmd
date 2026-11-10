@@ -72,10 +72,8 @@ started](detqc.html), already read, calibrated and filtered, with the simulated 
 animal. ST-02 and ST-03 carry depth sensors,
 and one of the four dies part-way through. Use your own filtered set in its place. The rules read
 which receivers listened on each day, so `audit_listening()` runs first. With your own data, audit
-before the filters, as [Get started](detqc.html#audit-the-listening-days) does: a detection a
-filter removes still shows that the receiver was listening. This included set is already
-filtered, and every receiver of the array worked, so naming them all in `known_listening` keeps
-every day listening.
+before the filters, as [Get started](detqc.html#audit-the-listening-days) does. Every receiver of
+this array worked, so the code names them all in `known_listening`.
 
 ```{r detset}
 library(detqc)
@@ -93,31 +91,27 @@ dets
 
 ## Step 1. Flag: sort the animals into mortality bands
 
-`detect_mortality()` is a flagging filter for human review. It sorts every detected animal into
-one of three bands, and a band is a candidate for you to check on a card, never a call. No
-detection is removed until you call an animal dead.
+`detect_mortality()` sorts every detected animal into one of three bands for you to review on a
+card. No detection is removed until you call an animal dead.
 
 The bands come from rule streams. A stream is one rule that tests one kind of evidence in each
 animal's record: the final-run stream asks whether the last days of detections fall at one site,
-and the depth stream asks whether the depth reading stops changing. For each animal, each stream
-votes dead, alive or review, or gives no vote when it finds nothing to test. The votes of the
-deciding streams set the band, as the list below describes; an evidence stream, such as the depth stream,
-shows its vote on the card and does not move the band. A site, in these rules, is a group of
-stations within `sites_km` (1 km by default) of each other, so two receivers that hear one dead
-tag count as one place.
+and the depth stream asks whether the depth reading stops changing. Each stream votes dead, alive
+or review for each animal, or gives no vote. The deciding streams set the band; an evidence
+stream, such as the depth stream, shows its vote on the card and does not move the band. A site
+is a group of stations within `sites_km` (1 km by default) of each other, so two receivers that
+hear one dead tag count as one place.
 
 - **dead**: a stream found death evidence, such as a final run of detections at one site, and no
   stream found the animal alive after it.
 - **review**: the evidence is mixed, or the rules cannot see enough: a death vote beside an alive
   vote, a final run near one site, a sparse record, or a record that ends near the end of tag
-  life or of the data with no death vote. Where a record that ends there has a death vote, it
-  goes to review only when its death evidence starts within the record-end window of its last
-  detection; earlier evidence keeps the dead band.
+  life or of the data with no earlier death evidence.
 - **alive**: no death evidence, on a record that ended well before tag life and the end of the
   data.
 
-An animal heard to the end of the study is never cleared as alive without a card. The rules
-cannot see what happened after its last detection.
+An animal heard to the end of the study is never in the alive band: the rules cannot see what
+happened after its last detection.
 
 ```{r bands-default}
 # Band the animals with the default streams
@@ -133,18 +127,16 @@ settings, which suit studies of months; the final-run stream needs
 mortality_rules()
 ```
 
-Each stream tests one thing. `terminal_run` votes dead when the last days of detections fall at
+`terminal_run` votes dead when the last days of detections fall at
 one site, and `accel_flatline` and `depth_flatline` look for a sensor that stops changing to the
 end of the record. `movement_resumption` votes alive when the animal is heard away from that site
 later, `record_end` votes review on a record that ends near the tag's life or the end of the data,
 `site_listening` counts the days the last site's receivers listened after the last detection, and
 `persistence` scores how little the core stations change, which orders the review band. A stream
-votes "unavailable" for an animal it cannot judge, such as one with no sensor of its kind, a record with
-fewer detection days than the final run needs, or a last site with no listening record.
+votes "unavailable" for an animal it cannot judge, such as one with no sensor of its kind.
 
-The settings below scale the streams to this study of 2 to 10 June 2024: a final run of three detection
-days over three calendar days, a flat depth record of two days, and a record end within two days
-of the end of the data. A setting given by name applies to every stream that has it. Shorter
+The settings below scale the streams to this nine-day study; a setting given by name applies to
+every stream that has it. Shorter
 settings flag more animals. Set them from what your species does: a three-day rest at one
 station is common in some species and rare in others.
 
@@ -185,34 +177,25 @@ stopifnot(end_gap_h[["ST-04"]] == 0, end_gap_h[["ST-03"]] < 24 * end_window)
 st02_gap_d <- round(as.numeric(difftime(st02$last_detection, st02$death_date,
                                         units = "days")), 1)
 stopifnot(st02$band == "dead", st02_gap_d > end_window)
-# ST-02's depth vote: flat days to the end of the record, the first flat
-# day, and two counts of its sensor on the calibrated scale
+# ST-02's depth vote: flat days to the end of the record and the first flat
+# day
 depth_vote <- bands$votes[bands$votes$animal_id == "ST-02" &
                             bands$votes$rule == "depth_flatline", ]
 stopifnot(depth_vote$vote == "dead")
 flat_from <- as.Date(depth_vote$date, tz = "UTC")
-two_counts <- 2 * animals$sensor_slope[animals$animal_id == "ST-02"]
 ```
 
 ST-02 is in the dead band. Its candidate death date, `r when(st02$death_date)`, is the first
-detection of its final run at one site. Because every receiver in the example listened on every
-day, that is the earliest the death could be, given the detections, and the death may be later,
-because an animal may hold station alive before it dies. Where a site stopped listening before a
-run, the card gives the detection before the run as the earliest date instead. The sensor record on the card is what you
-use to set the date of death. The simulation that made these files killed ST-02 at
+detection of its final run at one site; the death may be later, because an animal may hold
+station alive before it dies. The simulation that made these files killed ST-02 at
 `r when(example_mortality$fates$death_datetime[example_mortality$fates$animal_id == "ST-02"])`,
-part-way into that run. The depth stream votes dead as well. It judges a day flat at the sensor's
-resolution, when the day's depth range is within two counts of the sensor (`r two_counts` m on
-these tags), and finds ST-02's depth flat on its last `r nw(depth_vote$score)` days, from
-`r as.integer(format(flat_from, "%d"))` `r format(flat_from, "%B")`. Its vote is evidence, shown
-on the card, and never decides a band or sets the date. ST-01 stays in review because its final days fall at one site
-apart from stray detections on a few days (`terminal_run_stray`). `record_end` votes review for
-all four animals, because each record ends within `r nw(end_window)` days of the end of the data,
-the window the scaled rule treats as the end of the record. ST-03 and ST-04 get no other vote, so
-for them `record_end` decides the band: ST-03's last detection falls
-`r end_gap_h[["ST-03"]]` h before the end of the data, and ST-04 is heard to the end. For ST-02
-the vote does not move the band, because its death evidence starts `r st02_gap_d` days before
-its last detection at `r when(st02$last_detection)`, outside the window.
+part-way into that run, and the sensor record on the card is what you use to set the date. The
+depth stream votes dead as well: ST-02's depth is flat on its last `r nw(depth_vote$score)` days,
+from `r as.integer(format(flat_from, "%d"))` `r format(flat_from, "%B")`. ST-01 stays in review
+because its final days fall at one site apart from stray detections on a few days
+(`terminal_run_stray`). ST-03 and ST-04 are in review because their records end within
+`r nw(end_window)` days of the end of the data (`record_end`). `record_end` votes review for
+ST-02 as well; its death evidence starts before that window, so it stays in the dead band.
 
 The depth record shows when it died (Figure 1).
 
@@ -227,7 +210,7 @@ moving <- abs(st02_depth$sensor_value - flat_depth) > 0.1
 flat_start <- st02_depth$datetime[max(which(moving)) + 1]
 ```
 
-```{r depth-figure, fig.height = 3.6, fig.alt = "Calibrated depth of ST-02 and ST-03 over time; ST-02's depth still changes after the red line at its candidate death date and stays at one depth from early on 4 June.", fig.cap = sprintf("**Figure 1.** Calibrated depth of the two walleye with depth sensors, one point per detection that carried a reading (%s for ST-02 and %s for ST-03, after the filters). ST-02 is in the %s band; ST-03 is in the %s band, its record ending near the data's end. The dashed line marks ST-02's candidate death date, %s, the start of its final run; its depth still changes after it and holds at %s m from %s, the simulated death.", format(sum(depth$animal_id == 'ST-02'), big.mark = ','), sum(depth$animal_id == 'ST-03'), bands$bands$band[bands$bands$animal_id == 'ST-02'], bands$bands$band[bands$bands$animal_id == 'ST-03'], when(st02$death_date), flat_depth, when(flat_start))}
+```{r depth-figure, fig.height = 3.6, fig.alt = "Calibrated depth of ST-02 and ST-03 over time; ST-02's depth still changes after the red line at its candidate death date and stays at one depth from early on 4 June.", fig.cap = sprintf("**Figure 1.** Calibrated depth of the two walleye with depth sensors (%s readings for ST-02 and %s for ST-03). ST-02's depth still changes after its candidate death date, %s, and holds at %s m from %s, the simulated death.", format(sum(depth$animal_id == 'ST-02'), big.mark = ','), sum(depth$animal_id == 'ST-03'), when(st02$death_date), flat_depth, when(flat_start))}
 # Take ST-02's band row, with its candidate death date
 st02 <- bands$bands[bands$bands$animal_id == "ST-02", ]
 # Keep the detections that carry a depth reading
@@ -248,7 +231,7 @@ ggplot2::ggplot(depth, ggplot2::aes(datetime, sensor_value)) +
   ggplot2::theme(legend.position = "bottom")
 ```
 
-The flat end of ST-02's record is what `depth_flatline` votes dead on. ST-03 moves up and down
+`depth_flatline` votes dead on the flat end of ST-02's record. ST-03 moves up and down
 through the water to its last reading, and the stream gives it no vote.
 
 ### Assigning a rule of your own
@@ -293,11 +276,10 @@ bands$bands[, c("animal_id", "band", "depth_still_vote")]
 
 `review_mortality()` writes one card per animal in the dead and review bands and an index of
 every animal, then opens the index in your browser; `all = TRUE` writes a card for the alive band
-too. [The four review cards](../example/mortality_review/index.html) of the Get started page's run show
-the cards for a dead animal and three in review. The cards are plain HTML files with no R
-session behind them, so a co-author who does not use R can read them. The card map draws the
-stations on a blank background. An `sf` polygon of the water body, passed in
-`control`, is drawn underneath; here it is made from the depth raster of Stoney Lake.
+too. [The four review cards](../example/mortality_review/index.html) of the Get started page show
+a dead animal and three in review. The cards are plain HTML files, so a co-author who does not
+use R can read them. An `sf` polygon of the water body, passed in `control`, is drawn under the
+card map; here it is made from the depth raster of Stoney Lake.
 
 ```{r cards}
 # Make the lake outline for the card maps from the depth raster
@@ -311,8 +293,8 @@ dets <- review_mortality(dets, review_dir, bands = bands, open = interactive(),
 dets$cards[, c("animal_id", "band", "bytes", "checked")]
 ```
 
-The detection set lists the cards in its field `cards`. `checked = TRUE` means every number on the card matched the detection set when the function read
-the card back from disk. `build_mortality_cards()` writes the cards. Call it yourself to write
+The detection set lists the cards in `dets$cards`; `checked = TRUE` means the numbers on the card
+matched the detection set. `build_mortality_cards()` writes the cards; call it yourself to write
 them without opening a browser, or for one band only:
 
 ```{r dead-cards}
@@ -325,34 +307,19 @@ dead_only$cards[, c("animal_id", "band", "checked")]
 ```
 
 ```{r card-window, include = FALSE, purl = FALSE}
-# Read the cursor and window the screenshots were taken with
-# (tools/vignette_screenshots.R), and find the first day of the card's record
+# Read the cursor the screenshots were taken with (tools/vignette_screenshots.R)
 shot <- jsonlite::read_json("figures/screenshots.json")$review_card_top.png
 day_text <- function(d) {
   d <- as.Date(d)
   paste(as.integer(format(d, "%d")), format(d, "%B %Y"))
 }
-card_times <- dets$detections$datetime[dets$detections$animal_id == shot$card]
-card_first_day <- as.Date(min(card_times), tz = "UTC")
-window_held <- min(shot$window_days,
-                   as.integer(as.Date(shot$cursor) - card_first_day) + 1)
-# The scaled settings the card was written with, and the study's length
-det_days <- as.Date(dets$detections$datetime, tz = "UTC")
-study_days <- as.integer(max(det_days) - min(det_days)) + 1L
-scaled <- sprintf(paste("The card was written with the rules scaled to the %s-day study:",
-                        "a final run of %s detection days over %s calendar days, %s flat",
-                        "depth days, and a record end within %s days."),
-                  nw(study_days), mort_rules$terminal_run$settings$min_days,
-                  mort_rules$terminal_run$settings$min_calendar_days,
-                  mort_rules$depth_flatline$settings$min_flat_days,
-                  mort_rules$record_end$settings$within_days)
 ```
 
-```{r card-top, echo = FALSE, purl = FALSE, out.width = "100%", fig.alt = "Screenshot of the top of the review card of ST-02: the header and the map of the stations that heard it.", fig.cap = sprintf("**Figure 2.** Top of the review card of ST-02, with the cursor on %s and a %s-day window, which here reaches back to the first day of the record, %s, and so holds %s days. The table of the window's numbers, to the right of the map, is cut off here. %s", day_text(shot$cursor), shot$window_days, day_text(card_first_day), nw(window_held), scaled)}
+```{r card-top, echo = FALSE, purl = FALSE, out.width = "100%", fig.alt = "Screenshot of the top of the review card of ST-02: the header and the map of the stations that heard it.", fig.cap = sprintf("**Figure 2.** Top of the review card of ST-02, with the cursor on %s.", day_text(shot$cursor))}
 knitr::include_graphics("figures/review_card_top.png")
 ```
 
-```{r card-panels, echo = FALSE, purl = FALSE, out.width = "100%", fig.alt = "Screenshot of the time panels of the ST-02 review card, from detections per station to the rule votes.", fig.cap = sprintf("**Figure 3.** Lower part of the same card: the call bar, the cursor slider and the time panels, 2 to 10 June 2024, with the key to the marks below them; the window is %s days. From 4 June the tag is heard every day at S011, the centroid stops moving, and the depth is flat.", shot$window_days)}
+```{r card-panels, echo = FALSE, purl = FALSE, out.width = "100%", fig.alt = "Screenshot of the time panels of the ST-02 review card, from detections per station to the rule votes.", fig.cap = "**Figure 3.** Lower part of the same card. From 4 June the tag is heard every day at S011, the centroid stops moving, and the depth is flat."}
 knitr::include_graphics("figures/review_card_panels.png")
 ```
 
@@ -364,8 +331,7 @@ How to read a card:
 - A card opens with its cursor on the first day of the record. Move the cursor with the slider or
   the arrow keys (Shift and an arrow moves 7 days; **Home** and **End** go to the first and the
   last day). The map shows the window that ends at the cursor (Figure 2). Space plays the record.
-- In a browser window narrower than about 1,400 pixels, the table of the window's numbers beside
-  the map runs past the right edge of the screen. Widen the window to read it.
+- Widen the browser window if the table beside the map is cut off.
 - Make the call with the buttons or the keys: **A** alive, **D** dead or shed, **U** uncertain.
   D takes the candidate death date. For another date, move the cursor to the day and press **X**,
   or type the date.
@@ -402,9 +368,7 @@ write.csv(calls, calls_file, row.names = FALSE)
 calls[, c("animal_id", "call", "death_date", "death_time", "date_source")]
 ```
 
-`apply_mortality_calls()` reads the file and stores each call in the detection set. It refuses a
-file that names an animal the set does not contain, so calls from another study cannot apply in
-part.
+`apply_mortality_calls()` reads the file and stores each call in the detection set.
 
 ```{r apply}
 # Store the calls in the detection set
@@ -421,11 +385,9 @@ example_mortality$fates
 ```
 
 `filter_mortality()` removes each dead or shed animal's detections from `margin_days` days before
-its death, 7 by default, to remove any behaviour leading up to death (optional). A call with a death time cuts at that
-time less the margin. A call with a date only cuts by whole UTC days; with `margin_days = 0` it
-keeps the whole death day. A card writes the time when the call takes the candidate date, which
-is the time of the first detection of the final run; a date set with the cursor or typed has no
-time. Alive and uncertain animals keep every detection.
+its death, 7 by default, to remove any behaviour leading up to death. A call with a death time
+cuts at that time less the margin; a call with a date only cuts by whole UTC days. Alive and
+uncertain animals keep every detection.
 
 ```{r lived, include = FALSE, purl = FALSE}
 fates <- example_mortality$fates
@@ -455,26 +417,20 @@ tail(detset_log(dets)[, c("step", "rows_before", "rows_after", "removed")], 2)
 ```{r filter-counts, include = FALSE, purl = FALSE}
 log_table <- detset_log(dets)
 cut_n <- log_table$removed[log_table$step == "filter_mortality"]
-same_n <- if (nrow(dets$detections) == nrow(stoney_clean$detections)) {
-  "as many as"
-} else {
-  "a different count from"
-}
 ```
 
 The cut removed `r format(cut_n, big.mark = ",")` detections of ST-02, every one after 02:00 UTC
-on 3 June. The set now holds `r format(nrow(dets$detections), big.mark = ",")` detections,
-`r same_n` the set of the Get started page and the included `stoney_clean`.
-The log records the calls file by name and checksum. `processing_report(dets, file, bands = bands)`
-adds the bands and the calls to the report, as in [the processing
-report](../example/processing_report.html) of the Get started page's run. The report does not link to the
-cards, so keep the review folder beside it.
+on 3 June. The set now holds `r format(nrow(dets$detections), big.mark = ",")` detections.
+The log records the calls file.
+`processing_report(dets, file, bands = bands)` adds the bands and the calls to the report, as in
+[the processing report](../example/processing_report.html) of the Get started page. The report
+does not link to the cards, so keep the review folder beside it.
 
 ## When new data arrive
 
-`reconcile_mortality()` lists the calls that new data put in question: an animal with no call in
-the dead or review band, one called alive and now in the dead band, one called dead and now alive
-or heard away from where it died, an uncertain call, or a dead call with no date. It changes no
+`reconcile_mortality()` lists the calls that new data put in question, such as an animal called
+alive that is now in the dead band, or one called dead and heard away from where it died
+(`?reconcile_mortality` lists every case). It changes no
 call; you make the new ones on the cards. Add the new detections, build the detection set again,
 apply the same calls file and run `detect_mortality()` before it.
 

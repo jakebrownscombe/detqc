@@ -92,16 +92,13 @@ with the package. With `format = "auto"`, the default, `read_detections()` picks
 from the header of the file:
 
 - `"otn"`: an OTN detection extract, CSV or Parquet, matched to animals, qualified, unqualified or
-  sentinel. A Parquet extract's `geometry` column holds binary values and is dropped with a
-  message;
+  sentinel;
 - `"glatos"`: a GLATOS detection export;
 - `"vue"`: a VUE or Fathom detection export with the VUE header;
-- `"vdat"`: a Fathom VDAT CSV, from a receiver's VRL or VDAT file. VDAT CSV exports of VR2Tx
-  and NexTrak receivers are both read, their detections and their status records.
+- `"vdat"`: a Fathom VDAT CSV, from the VRL or VDAT file of a VR2Tx or NexTrak receiver.
 
-The VRL or VDAT file itself is binary, so no function reads it: export it to a VDAT CSV with
-Fathom Connect first. A zip archive, as OTN publishes some extracts, is unzipped first. Both
-stop with a message that says so.
+The VRL or VDAT file itself is binary: export it to a VDAT CSV with Fathom Connect first. Unzip a
+zip archive, as OTN publishes some extracts, before you read it.
 
 `read_receiver_logs()` reads the receiver's own status records from the same VDAT CSV (see
 [Receiver logs](#receiver-logs)).
@@ -111,11 +108,8 @@ Excel), the OTN deployment CSV, OTN AAT receiver files, the OTN moorings receive
 OTN stations-receivers file, GLATOS receiver location files and the deployment sheet of a GLATOS
 project workbook. `read_animals()` reads the OTN tagging sheet, the OTN tag release file, the
 tagging sheet of a GLATOS workbook and GLATOS detection exports. Excel files need the **readxl**
-package. Both take `format = "auto"` by default and pick the OTN or GLATOS map from the header,
-whichever fills more of the contract columns. Given a format that leaves a contract column empty
-while the other format's columns are in the file, they warn and name the column. When the column
-is one the table needs, as `station_id` of a GLATOS receiver file read with `format = "otn"`, they
-stop and name the format `"auto"` picks. The OTN tagging template often leaves
+package. Both take `format = "auto"` by default and pick the OTN or GLATOS map from the header.
+The OTN tagging template often leaves
 `ANIMAL_ID` blank while the OTN matched extract names animals by `catalogNumber`: read such a sheet
 with `missing_id = "transmitter"`, and the release filters match the extract's detections to it by
 transmitter and release time.
@@ -127,11 +121,10 @@ column_map("detections", "glatos")[, c("target", "source", "type", "tz")]
 ```
 
 Each row maps one column of the file (`source`) to one column `read_detections()` returns
-(`target`).
-Where several rows name one target, the first with a value is used, row by row. A `source` with a
+(`target`). A `source` with a
 `;` joins two columns: the GLATOS `transmitter_codespace` and `transmitter_id` become one
 `transmitter`, "A69-9002-61002". The fifth map, `otn_qualified`, reads an OTN extract not
-matched to animals, in which `catalogNumber` never names an animal, so `animal_id` is `NA`.
+matched to animals, so its `animal_id` is `NA`.
 
 ## One study, three exports
 
@@ -189,31 +182,12 @@ read_detections(own_file, format = "vue", col_map = my_map,
                 tz = "America/Toronto")
 ```
 
-With a data frame as `col_map`, your map replaces the packaged one, and `format` adds only the
-step that belongs to that kind of file: `"otn"` sets aside rows whose receiver is `release`,
-`"vdat"` reads the record layout of a Fathom file, and `"vue"`, the one to use for a plain CSV,
-treats a station position of 0, 0 as missing. Without `format`, a file that no format fits is
-read by your map alone. To start from a packaged map, copy its rows with
-`column_map()` and change `source`. When the format reads every column but a few, give those few
-as pairs, such as `col_map = c(receiver_serial = "Rx")`; they are merged into the format's map,
-and every other column is read as the format reads it. A pair of columns joined by `;` is joined
-in the order given. GLATOS joins `transmitter` from `transmitter_codespace;transmitter_id` in a
-detection export and from `tag_code_space;tag_id_code` in a workbook's tagging sheet, so a pair
-for it names both columns in that order: `c(transmitter = "transmitter_codespace;tag_id")`. A
-GLATOS pair or row of a full map in another order, or of three or more columns, stops with an
-error that gives the format's order.
-
-In any format, columns joined for `transmitter` must give codes such as `A69-1601-12345`: a code
-space in the first column, digits in each later column, and `"-"` between them. The `"vue"` map
-reads `transmitter` from one column and joins with nothing, so two columns read as `"vue"` need a
-full map whose `transmitter` row has the `sep` `"-"`. A pair or a row of one column is tested in
-every format, unless the format reads that column for `transmitter` itself. A one-column source
-of whole codes reads. So does a code-space column under a name no packaged map reads, because
-shape cannot tell the two apart. A code-space column a packaged map reads, such as
-`transmitter_codespace`, stops by its name. So does a column the maps read for a receiver, a
-station, a time or a position. A column of IDs alone stops. A pair whose column is not in the
-file stops too.
-`read_deployments()` and `read_animals()` take `col_map` too.
+With a data frame as `col_map`, your map replaces the packaged one; give `format = "vue"` for a
+plain CSV. To start from a packaged map, copy its rows with `column_map()` and change `source`.
+When the format reads every column but a few, give those few as pairs, such as
+`col_map = c(receiver_serial = "Rx")`; they are merged into the format's map.
+`read_deployments()` and `read_animals()` take `col_map` too; `?read_detections` and
+`?column_map` give the rules.
 
 ## Time zones
 
@@ -237,20 +211,15 @@ try(read_detections(gap_file, format = "vue", col_map = my_map,
 
 The file's clock did not follow the zone you gave: read a receiver whose clock stayed on standard
 time all year with a fixed offset, such as `tz = "Etc/GMT+5"` for UTC-5 (the sign is reversed in
-these names). A clock time in the repeated autumn hour is read as standard time, with a warning
-that counts such times. Once the data are in a detection set, the `non_utc` and `dst_jump` checks
+these names). A clock time in the repeated autumn hour is read as standard time, with a warning.
+Once the data are in a detection set, the `non_utc` and `dst_jump` checks
 of `check_detset()` look for offsets the import functions could not see.
 
 ## Several files, and studies too large for memory
 
-A study often arrives as many export files, one per receiver download or per year, and a large
-network's detections may not fit in the memory of one computer. `read_detections()` reads many
-files in one call and stacks them into one table, and its `cut` argument keeps only the rows you
-ask for as each file is read, so memory holds one whole file at a time rather than the whole
-study.
-
-Given several paths, `read_detections()` names the file of each row in `source_file`; a column
-one file lacks is `NA` in its rows.
+`read_detections()` reads many files in one call and stacks them into one table, with the file of
+each row in `source_file`. Its `cut` argument keeps only the rows you ask for as each file is
+read, so memory holds one whole file at a time rather than the whole study.
 
 ```{r stack}
 # Read two files in one call; source_file names each row's file
@@ -279,9 +248,8 @@ lists them.
 
 ## Receiver files: VDAT
 
-From a Fathom VDAT CSV, `read_detections()` reads the detections (`DET`) and the sensor
-detections (`DET_SENS`), drops a `DET` record that repeats a `DET_SENS` record, and keeps the
-receiver's own transmitter settings in an attribute. The example is the first 150 detections of
+From a Fathom VDAT CSV, `read_detections()` reads the detections and the sensor detections, and
+keeps the receiver's own transmitter settings in an attribute. The example is the first 150 detections of
 receiver R011:
 
 ```{r vdat}
@@ -326,13 +294,10 @@ transmissions are never merged.
 
 ## Receiver logs
 
-In a VDAT CSV from a VR2Tx, the receiver's own status records come hourly or daily: the temperature,
-the noise, the tilt, the pulses counted and the battery
-(`DIAG`, `TEMP`, `ATTITUDE`, `BATTERY`, `HEALTH_VR2TX`), with event records such as the
-initialisation, a reboot or a download (`EVENT_INIT`, `EVENT`, `EVENT_OFFLOAD`).
+A VDAT CSV also holds the receiver's own status records: the temperature, the noise, the tilt,
+the pulses counted and the battery, with events such as a reboot or a download.
 `read_receiver_logs()` reads them into one table, one row per record. A `DIAG` record also counts
-the detections the receiver decoded since its previous `DIAG` record, of every transmitter it
-heard, in `log_detections`.
+the detections the receiver decoded, of every transmitter it heard, in `log_detections`.
 
 ```{r receiver-logs}
 # Read the logs of the example receivers, one file per receiver
@@ -354,20 +319,16 @@ stopifnot(all(startsWith(logs$receiver_model, "VR2Tx")),
           all(deployments$receiver_model[deployments$receiver_serial %in% rx_logged] == "VR2Tx"))
 ```
 
-The synthetic logs cover the `r length(rx_logged)` VR2Tx receivers of the example, one file each,
-and hold the record types counted above; `r rx_no_log`, a `r no_log_model`, has no log.
+The synthetic logs cover the `r length(rx_logged)` VR2Tx receivers of the example;
+`r rx_no_log`, a `r no_log_model`, has no log.
 
 Given these logs, `audit_listening()` reads them on each full day on which a receiver has no
-detection in the set, inside the dates its log covers. It reads such a quiet day in one of three
-ways. A day with no status record is `off`: the receiver was not running, and the day counts as
-not listening; no detection count can change that. A day with status records and no detection
-counted is `deaf` when a reference tag was expected and not heard, which counts as not listening,
-and `logging_silent` when none was expected, which counts as listening. A day on which the
-receiver's own `DIAG` records counted detections is `listening` (`reference_missed` when a
-reference tag was expected): the receiver decoded a transmitter that day, of this project or
-another, though the set holds none of those detections. A day with a detection
-in the set keeps its status, and the days of a receiver with no log keep the statuses of the
-detections and reference tags alone.
+detection in the set. A day with no status record is `off`: the receiver was not running, and
+the day counts as not listening. A day with status records and no detection counted is `deaf`
+when a reference tag was expected and not heard, which counts as not listening, and
+`logging_silent` when none was expected, which counts as listening. A day on which the
+receiver's own `DIAG` records counted detections is `listening`: the receiver decoded a
+transmitter that day, of this project or another. `?audit_listening` gives every status.
 
 ```{r audit-logs}
 # Build the set, and audit each receiver-day with the logs
@@ -402,18 +363,14 @@ off_days <- dets_logged$listening[dets_logged$listening$status == "off", ]
 ```
 
 R007 logged nothing on `r nw(nrow(off_days))` days, so the audit reads them as days it did not
-listen, where the detections alone would have called them silent and listening. R020 has no log,
-so its days stay `silent`. This example has no reference tags, so no day can be `deaf`; with your
-own data give them in `reference_tags`. `as_detfield_input()` hands the `off` and `deaf` days,
-as not listening, to the [**detfield**](https://jakebrownscombe.github.io/detfield/) R package,
-the positioning component of positionR.
+listen. R020 has no log, so its days stay `silent`. This example has no reference tags, so no day
+can be `deaf`; with your own data give them in `reference_tags`. `as_detfield_input()` hands the
+`off` and `deaf` days, as not listening, to the
+[**detfield**](https://jakebrownscombe.github.io/detfield/) R package.
 
-The example's logs count exactly the detections of its export, so on the set as read no quiet day
-has a count. Evidence of listening is lost before the audit sees it in two ways: an export holds
-one project's tags, so the detections of other projects' tags were never in it, and a filter run
-before the audit removes detections that a working receiver decoded. The code below shows the
-second: it filters first, the order [Get started](detqc.html#audit-the-listening-days) avoids,
-then audits with and without the logs.
+A filter run before the audit removes detections that a working receiver decoded. The code below
+filters first, the order [Get started](detqc.html#audit-the-listening-days) avoids, then audits
+with and without the logs.
 
 ```{r logs-after-filters}
 # Remove the post-release and isolated detections before the audit
@@ -460,9 +417,7 @@ head(nextrak_diag[, c("receiver_model", "datetime", "noise", "noise_unit",
                       "log_detections")], 3)
 ```
 
-`read_receiver_logs()` reads Fathom VDAT CSV files. A file with status records and no `DIAG` or
-`DIAG_NEXTRAK` record, as a NexTrak export of Fathom Connect 4.0 can be, is named in a message, and
-`DATA_ERROR` records are counted in a message. The yearly receiver-event CSV files that VUE
+`read_receiver_logs()` reads Fathom VDAT CSV files; the yearly receiver-event CSV files that VUE
 exports are not read.
 
 ## Sensors and tag specifications
@@ -565,32 +520,23 @@ read_animals(tagging, format = "otn", col_map = tag_map, tz = "America/Toronto",
 ```
 
 ST-02 gets both codes, each with its delays, sensor type and calibration from the specification
-sheet where the tagging sheet leaves them blank. A tag serial missing from the specification sheet
-gets a warning that names it; such a tag has no delays, and a sensor tag also loses its second code
-and its calibration, so read the sheet of every order of tags.
+sheet. A tag serial missing from the specification sheet gets a warning and has no delays or
+calibration, so read the sheet of every order of tags.
 
 ## The data-entry checks
 
-`check_detset()` runs the checks below, in this order, reports each with a count and its
-denominator, returns the offending rows in `dets$checks$rows`, and never changes the data. Some
-need an input you give, and report `not run` without it: `water` (a polygon of the water body, or
-a depth raster in metres, positive down) for the land and depth checks; `field` (a detection range
-in metres, or a detection field from the
-[**detfield**](https://jakebrownscombe.github.io/detfield/) R package, the positioning component of
-positionR) for the last two; a `download_datetime` column for
-the download check; `max_liberty_years` in `check_settings()` for records that run longer after
-release than any tag lasts; and `reference_tags`, the transmitters built into or moored at
-receivers, whose detections prove that a receiver was listening, for the co-detection tests of
-moved moorings.
+`check_detset()` runs the checks below, reports each with a count and its denominator, returns
+the offending rows in `dets$checks$rows`, and never changes the data. Some need an input you
+give, and report `not run` without it: `water` (a polygon of the water body, or a depth raster
+in metres, positive down) for the land and depth checks; `field` (a detection range in metres,
+or a detection field from the [**detfield**](https://jakebrownscombe.github.io/detfield/) R
+package) for the last two; and `reference_tags`, the transmitters built into or moored at
+receivers, for the co-detection tests of moved moorings. `?check_detset` lists the others.
 
 An OTN deployment sheet records the receiver's own transmitter, or a sentinel tag on the same
 mooring, in its `TRANSMITTER` column; `read_deployments()` reads it as `receiver_transmitter`.
-When you give no `reference_tags`, `check_detset()` and `audit_listening()` use those ids, each at
-its deployment's position, and say so in a message; an id that the animals table also lists is
-left out with a warning. To use other ids, pass them: to `check_detset(reference_tags = )` as
-`transmitter`, `deploy_lat` and `deploy_lon`, and to `audit_listening(reference_tags = )` as
-`transmitter` and, optionally, the `receiver_serial` expected to hear each. Keep their detections
-in the set until both have run.
+When you give no `reference_tags`, `check_detset()` and `audit_listening()` use those ids. Keep
+the detections of reference tags in the set until both have run.
 
 The example includes the Stoney receivers as an OTN short form with a `TRANSMITTER` column: the
 transmitter built into each VR2Tx and, for R020, a VR2W, a sentinel tag on its mooring. R020's
@@ -627,8 +573,7 @@ knitr::kable(checks[, c("check", "group", "description", "unit")],
              col.names = c("Check", "Group", "What it flags", "Counted in"))
 ```
 
-Each threshold is a choice you state. `check_settings()` lists them with their defaults; change
-one by name:
+`check_settings()` lists the thresholds with their defaults; change one by name:
 
 ```{r settings}
 # Show the thresholds and their defaults
@@ -643,8 +588,7 @@ check_summary <- dets$checks$summary
 silent_before <- check_summary$flagged[check_summary$check == "receiver_silent"]
 ```
 
-`?check_settings` says what each threshold does, and `?check_detset` gives the limits of three
-checks measured on test arrays.
+`?check_settings` says what each threshold does.
 
 ## What the checks catch
 
@@ -772,20 +716,16 @@ jump_m <- sqrt((far$x - stations$x[at_true])^2 +
 
 The swap and the two tag-code errors are gone. `receiver_silent` flags one receiver fewer than the
 `r nw(silent_before)` of the unplanted study ([Run the checks](detqc.html#run-the-checks) on Get
-started), because the false detection is the only one at `r far$station_id`. `receiver_silent` and
-`audit_listening()` count a detection of any transmitter in the set, including codes no animal
-carries; what they cannot count is a detection the export never held, except that
-`audit_listening()` given `logs` counts the detections the receiver's own log recorded. A detection
-export
-holds one project's tags, so a receiver that heard only other projects' tags looks silent. Confirm
-a silent receiver against the field records, or against its log, whose detection counts include
-every transmitter it decoded; `audit_listening()` reads them ([Receiver logs](#receiver-logs)).
+started), because the false detection is the only one at `r far$station_id`. A detection export
+holds one project's tags, so a receiver that heard only other projects' tags looks silent:
+confirm a silent receiver against the field records, or against its log ([Receiver
+logs](#receiver-logs)).
 The false
 detection passes every check, because one detection at a real receiver is a valid record. On the
 map (Figure 3) it is a jump no walleye swims in two minutes, and `filter_speed()` removes it
 below.
 
-```{r jump-map, fig.width = 7, fig.height = 5.4, fig.alt = "Map of Stoney Lake shaded by depth, with the receivers that heard the four walleye as yellow rings sized by their detections, the receivers that heard none as white rings, and a dashed red line from the station that heard ST-01 to the station of the planted false detection, at the far end of the lake.", fig.cap = sprintf("**Figure 3.** The planted false detection, on the repaired set with the false detection still in it: %s heard ST-01 at %s, and the false detection puts it at %s 2 min later, about %s m away (the dashed line). %s of the %s receivers heard none of the four walleye.", true_row$station_id, when(true_row$datetime), far$station_id, big(round(jump_m, -2)), cap_nw(silent_n), silent_of)}
+```{r jump-map, fig.width = 7, fig.height = 5.4, fig.alt = "Map of Stoney Lake shaded by depth, with the receivers that heard the four walleye as yellow rings sized by their detections, the receivers that heard none as white rings, and a dashed red line from the station that heard ST-01 to the station of the planted false detection, at the far end of the lake.", fig.cap = sprintf("**Figure 3.** The planted false detection: %s heard ST-01 at %s, and the false detection puts it at %s 2 min later, about %s m away. %s of the %s receivers heard none of the four walleye.", true_row$station_id, when(true_row$datetime), far$station_id, big(round(jump_m, -2)), cap_nw(silent_n), silent_of)}
 # Map the receivers over the lake depth, sized by their detections
 receiver_map <- plot_receivers(dets, water = lake)
 # Take the positions of the station that heard ST-01 and of the false
@@ -814,11 +754,7 @@ run on [Get started](detqc.html), and the tolerance of `filter_duplicates()` is 
 above. Look
 at the set first: `plot_abacus()` draws each animal's detections by station and hour (Figure 4).
 
-```{r abacus-counts, include = FALSE, purl = FALSE}
-lanes_n <- nrow(unique(dets$detections[, c("animal_id", "station_id")]))
-```
-
-```{r abacus, fig.width = 7, fig.height = 5.2, fig.alt = "Detections of the four walleye by station and hour; ST-02's record ends on one row from 4 June.", fig.cap = sprintf("**Figure 4.** `plot_abacus(dets, rows = \"station\")` on the repaired set, the false detection still in it: one point per animal, station and hour with a detection, on one row for each station that heard the animal (%s rows).", lanes_n)}
+```{r abacus, fig.width = 7, fig.height = 5.2, fig.alt = "Detections of the four walleye by station and hour; ST-02's record ends on one row from 4 June.", fig.cap = "**Figure 4.** Detections of the four walleye by station and hour, with the false detection still in the set."}
 # Draw the detections by animal, station and hour
 plot_abacus(dets, rows = "station")
 ```
@@ -866,10 +802,9 @@ The Stoney files hold no detection before a release or outside a deployment, and
 `filter_speed()` removes detections that imply an animal swam faster than `max_speed_ms`, the
 highest speed you accept for your species. Steps between stations closer than `min_dist_m`, the
 largest distance at which two of your receivers hear one transmission, are never removed; it has no
-default, so take it from your range tests. The code below explores that distance: it fits the
-range test included with the package for its d05, the distance at which a receiver hears 5% of
-transmissions, and reads the d05 of the deepest receiver between it and the Stoney range model at
-35 m.
+default, so take it from your range tests. The code below takes it from the range test included
+with the package: its d05, the distance at which a receiver hears 5% of transmissions, read at
+the depth of the deepest receiver.
 
 ```{r speed-range}
 # Fit the range test's d05: a logistic curve of the share heard on distance
@@ -893,9 +828,7 @@ round(c(test_depth_m = test_depth, d05_test_m = d05_test,
         d05_deepest_m = d05_deepest_exact, d05_deepest_rounded_m = d05_deepest), 2)
 ```
 
-The deepest d05, `r format(round(d05_deepest_exact, 2), big.mark = ",")` m, rounds to
-`r big(d05_deepest)` m. Two receivers up to about `r big(2 * d05_deepest)` m apart, twice that, can
-share a
+Two receivers up to about `r big(2 * d05_deepest)` m apart, twice the deepest d05, can share a
 transmission, so `min_dist_m` is set to 2,500 m.
 
 ```{r speed-settings}
@@ -929,7 +862,7 @@ The steps the filter treats as violations:
 moves[moves$violation, c("animal_id", "datetime", "dist_m", "speed_ms")]
 ```
 
-```{r speed-figure, fig.width = 7, fig.height = 4.2, fig.alt = "Speed of each step between detections against the distance between the two stations, with the filter settings as dashed lines and two steps in the shaded corner.", fig.cap = sprintf("**Figure 5.** Speed of each step between consecutive detections of one animal at two different stations, against the distance between them, before `filter_speed()` (%s steps of %s animals). Dashed lines: `max_speed_ms` (%g m/s) and `min_dist_m` (%s m); the filter acts on the corner beyond both. Triangles: the two steps into and out of the planted false detection. %s on the top edge: one transmission heard at two stations in the same second, a step of no time and so of no finite speed.", big(nrow(moves)), nw(length(unique(moves$animal_id))), max_speed, big(min_dist), cap_nw(sum(is.infinite(moves$speed_ms))))}
+```{r speed-figure, fig.width = 7, fig.height = 4.2, fig.alt = "Speed of each step between detections against the distance between the two stations, with the filter settings as dashed lines and two steps in the shaded corner.", fig.cap = sprintf("**Figure 5.** Speed of each step between consecutive detections of one animal at two different stations, before `filter_speed()` (%s steps of %s animals). The dashed lines are `max_speed_ms` (%g m/s) and `min_dist_m` (%s m). A point on the top edge is one transmission heard at two stations in the same second.", big(nrow(moves)), nw(length(unique(moves$animal_id))), max_speed, big(min_dist))}
 # Mark the two steps into and out of the planted detection
 planted <- moves$animal_id == "ST-01" &
   (moves$datetime == false_row$datetime | moves$from == false_row$datetime)
@@ -1034,10 +967,7 @@ tail(detset_log(dets)[, c("step", "rows_before", "rows_after", "removed")], 1)
 Pincock's second condition, more short intervals than long ones, is off by default. `long_lag_s`
 adds it, with long meaning over 720 times the average delay, 24 times `max_lag`. The intervals are
 counted for each transmitter on each receiver over the whole set, and a pair that fails loses
-every detection, including those in close pairs. Where every gap between visits is long, a code
-heard only in close pairs passes however rare: four close pairs give 4 short intervals and 3 long.
-Each lone detection between the pairs adds a long interval, and one is enough to make a tie, which
-fails.
+every detection, including those in close pairs.
 
 ```{r filter-min-lag-long}
 # Apply both conditions to the set before the filter: long intervals are

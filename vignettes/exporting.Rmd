@@ -45,19 +45,17 @@ cap_nw <- function(n) {
 ```
 
 This page converts a detection set into the inputs of the
-[**detfield**](https://jakebrownscombe.github.io/detfield/) R package, focused on positioning, as
-well as other packages: the [**glatos**](https://ocean-tracking-network.github.io/glatos/) and
+[**detfield**](https://jakebrownscombe.github.io/detfield/) R package, the
+[**glatos**](https://ocean-tracking-network.github.io/glatos/) and
 [**actel**](https://actel.trackyverse.org/) R packages, and ATO (the Animal Tracking
-Object, a set of R classes from the trackyverse project, <https://ato.trackyverse.org>). It also saves the set in files other software reads, writes the
-processing report that records every step behind the set, and brings work done in **glatos** or
-**actel** back into **detqc**. The **glatos**, **actel**, **arrow** and **detfield** packages are
-needed only for the steps that call them; the code skips the **glatos**, **actel** and **arrow**
-steps when their package is not installed. **detfield** has its own hand-offs to other packages,
-in the section [Hand the positions
-on](https://jakebrownscombe.github.io/detfield/articles/positioning.html#hand-the-positions-on)
-of its positioning article.
+Object, a set of R classes from the trackyverse project, <https://ato.trackyverse.org>). It also
+saves the set in files other software reads, writes the processing report, and brings work done
+in **glatos** or **actel** back into **detqc**. The code skips the **glatos**, **actel** and
+**arrow** steps when their package is not installed. **detfield** has its own hand-offs to other
+packages ([Hand the positions
+on](https://jakebrownscombe.github.io/detfield/articles/positioning.html#hand-the-positions-on)).
 
-```{r report-screenshot, echo = FALSE, purl = FALSE, out.width = "100%", fig.alt = "Screenshot of the top of the processing report: its header and summary.", fig.cap = "**Figure 1.** The top of the processing report that the code at the end of this page writes. The files read and the full tables follow below the part shown."}
+```{r report-screenshot, echo = FALSE, purl = FALSE, out.width = "100%", fig.alt = "Screenshot of the top of the processing report: its header and summary.", fig.cap = "**Figure 1.** The top of the processing report that the code at the end of this page writes."}
 knitr::include_graphics("figures/processing_report_first_screen.png")
 ```
 
@@ -88,12 +86,9 @@ out_dir <- tempdir()
 
 `as_detfield_input()` returns the three inputs of **detfield**'s `bin_detections()`: the
 detections, the receiver listening days and the programmed transmission delays of each tag.
-**detqc** and **detfield** do not import each other and exchange only these tables.
-`audit_listening()` ran on `stoney_clean` before the filters and the mortality cut, so that a
-detection they removed still counts as evidence that its receiver was listening, and it named every
-receiver of the Stoney array in `known_listening`. With your own data, name only the receivers your field records or the network's
-receiver file confirm: a named receiver is never given `silent_run`, the status of a receiver that
-heard nothing on any day.
+`audit_listening()` ran on `stoney_clean` before the filters and named every receiver of the
+Stoney array in `known_listening`. With your own data, name only the receivers your field records
+or the network's receiver file confirm: the silent days of a named receiver count as listening.
 
 ```{r audit-status}
 # Count receiver-days by status, and give the dates the audit covers
@@ -101,17 +96,13 @@ table(dets$listening$status)
 range(dets$listening$date)
 ```
 
-A `listening` day is a full day in the water on which the receiver heard a transmitter: the set
-held one of its detections before the filters, or, given receiver logs, its own log counted one. A listening day can therefore hold no detection in the set that leaves this page.
-A `partial` day is a deployment or recovery day. A `silent` day is a full day with no detection and no reference tag to
-show the receiver worked; it counts as listening. The audit covers the days from the first to the
-last detection in the set, the range printed above. This example has no reference tags, so
-`known_listening` stands in for them. With reference tags in the water, given in
-`reference_tags`, a silent day on which a receiver should have heard one is read as not listening.
-Given the receivers' own logs in `logs`, a quiet day on which a receiver logged no record is `off`,
-a day it logged but missed an expected reference tag is `deaf`, and a day on which its log
-counted detections is `listening`; `as_detfield_input()` passes neither `off` nor `deaf` as
-listening ([Receiver logs](reading-files.html#receiver-logs)).
+A `listening` day is a full day in the water on which the receiver heard a transmitter, and a
+`partial` day is a deployment or recovery day. A `silent` day is a full day with no detection and
+no reference tag to show the receiver worked; it counts as listening. With reference tags in the
+water, given in `reference_tags`, a silent day on which a receiver should have heard one is read
+as not listening. Given the receivers' own logs in `logs`, the audit also finds the days a
+receiver was `off` or `deaf`, which `as_detfield_input()` passes as not listening ([Receiver
+logs](reading-files.html#receiver-logs)).
 
 `as_detfield_input()` then returns the three tables.
 
@@ -126,11 +117,9 @@ setdiff(unique(dets$detections$transmitter),
         detfield_input$tag_delay$transmitter)
 ```
 
-`tag_delay` gives the delays from the tag specification sheet, one row per transmitter. The last
-line lists the detected transmitters the sheet does not cover; here there are none.
-`bin_detections()` stops and names any such transmitter, so add its delays to the sheet, or leave
-its animal out, before you go on. When the animals table has no delays at all, `tag_delay` is
-`NULL` and a message says so.
+`tag_delay` gives the delays from the tag specification sheet, one row per transmitter.
+`bin_detections()` stops on a detected transmitter with no delays, so add its delays to the
+sheet, or leave its animal out, before you go on.
 
 The listening table has one row per receiver and day. The code below adds each receiver's
 station and counts the days by status.
@@ -172,9 +161,8 @@ on.
 
 ## glatos
 
-`to_glatos()` returns the detections as a `glatos_detections` data frame, with the columns **glatos**
-validates and the columns its filters and summaries read. It removes no row, and **glatos** need not
-be installed to make it.
+`to_glatos()` returns the detections as a `glatos_detections` data frame, with the columns the
+**glatos** filters and summaries read. **glatos** need not be installed to make it.
 
 ```{r glatos}
 # Convert the detections to a glatos_detections data frame
@@ -184,11 +172,9 @@ head(glatos_dets[, c("animal_id", "detection_timestamp_utc", "transmitter_id",
                      "receiver_sn", "glatos_array", "station")], 3)
 ```
 
-**glatos** groups detections by `glatos_array` unless told otherwise. The Stoney files put every
-station in one array, `STN`. Detections read from VUE or VDAT files have no array, so
-`glatos_array` and `station_no` hold the station. Give `location_col = "station"` to the **glatos**
-functions to work by station, as below, or fill `glatos_array` with your own array codes. The
-block runs when **glatos** is installed.
+**glatos** groups detections by `glatos_array` unless told otherwise, and the Stoney files put
+every station in one array, `STN`. Give `location_col = "station"` to the **glatos** functions to
+work by station, as below, or fill `glatos_array` with your own array codes.
 
 ```{r glatos-events}
 if (requireNamespace("glatos", quietly = TRUE)) {
@@ -218,24 +204,17 @@ attr(actel_input, "dropped")
 attr(actel_input, "actel_drops")
 ```
 
-No detection was dropped here. `to_actel()` counts each change **actel** needs in an attribute, so
-the loss is on record before **actel** makes it:
+No detection was dropped here. `to_actel()` counts each change **actel** needs in an attribute:
 
-- A deployment still in the water stops one second after the last detection
-  (`open_deployments`).
 - A detection with no station, or with a code that cannot be read, is left out (`dropped`).
 - `actel::preload()` drops the detections of transmitters not in the biometrics and those before
   release (`actel_drops`, counted ahead of time).
 - **actel** names a receiver by a whole number; the lookup is in `attr(actel_input, "receivers")`.
-- In **actel**, an array is a group of stations, such as the receivers across one section of a
-  river, that the analysis treats as one place an animal passes. The arrays follow each other in
-  the order an animal meets them along a river or other linear system. The `Array` column of
-  `spatial` holds each station's array, beside its `Station.name`, and the `dot` argument of
-  `preload()` connects the arrays, such as `"A1--A2--A3"`. A lake has no such order, so
-  `to_actel()` puts every station in one array, `A1`. For a river, give `to_actel()` `arrays`, the
-  array code of each station named by `station_id`, and give `preload()` the matching `dot`;
-  without a `dot`, `preload()` joins the arrays in a single line in the order `spatial` lists
-  them.
+- In **actel**, an array is a group of stations the analysis treats as one place, in the order
+  an animal meets them along a river. A lake has no such order, so `to_actel()` puts every
+  station in one array, `A1`. For a river, give `to_actel()` `arrays`, the array code of each
+  station named by `station_id`, and give `preload()` the matching `dot`, such as
+  `"A1--A2--A3"`.
 
 With **actel** installed, `preload()` takes the four tables and `read_detset_from()` brings the
 result back.
@@ -270,19 +249,11 @@ if (exists("preloaded")) {
   stopifnot(same, n_kept == nrow(dets$detections))
   group <- unique(actel_input$biometrics$Group)
   text <- paste(
-    "**actel** gives two warnings, and both are true of the example. The species, `%s`, which",
-    "`to_actel()` writes as **actel**'s group, is %s characters long, and **actel** advises six",
-    "or fewer for its plots. **actel**'s receivers %s to %s, at stations %s to %s, heard none",
-    "of the four walleye; Figure 2 above shows the same %s stations silent on every day.\n\n",
-    "`preload()` kept %s of the %s detections, and `read_detset_from()` brings back the same",
-    "detections, with the same UTC times, transmitters, receivers, stations and animals, the %s",
-    "deployments and the release time and position of each animal. The animals table comes back",
-    "with those columns only: the species, the tag model and delays and the sensor calibration",
-    "stay in `dets`.\n"
+    "**actel** warns that the group name `%s` is longer than six characters and that %s",
+    "receivers heard none of the four walleye. `read_detset_from()` brings back the detections,",
+    "the deployments and each animal's release; the other animal columns stay in `dets`.\n"
   )
-  cat(sprintf(text, group, nw(nchar(group)), min(quiet_rx), max(quiet_rx), quiet_st[1],
-              tail(quiet_st, 1), nw(length(quiet_st)), format(n_kept, big.mark = ","),
-              format(nrow(dets$detections), big.mark = ","), nrow(from_actel$deployments)))
+  cat(sprintf(text, group, nw(length(quiet_rx))))
 } else {
   cat("This page was built without **actel**, so the block shows no output.\n")
 }
@@ -290,9 +261,8 @@ if (exists("preloaded")) {
 
 ## ATO
 
-`to_ato()` returns the four ATO tables `det`, `dep`, `tag` and `ani`. Each has every column of
-ATO's template in its order, the `tz` column set to UTC, and the **detqc** columns ATO does not
-name. Build the ATO object from them with ATO's `make_det()`, `make_dep()`, `make_tag()`,
+`to_ato()` returns the four ATO tables `det`, `dep`, `tag` and `ani`, each with every column of
+ATO's template. Build the ATO object from them with ATO's `make_det()`, `make_dep()`, `make_tag()`,
 `make_ani()` and `init_ato()`.
 
 ```{r ato}
@@ -336,7 +306,7 @@ head(det_table$datetime, 3)
 
 `processing_report()` writes one HTML file: the files read, every logged step with its counts
 before and after, the checks, the detections removed by reason, the mortality bands and calls,
-and the figures. Every number in it is read from the log. It needs no internet and opens in any
+and the figures. It needs no internet and opens in any
 browser, so hand it on with the exported tables.
 
 Given the mortality bands from `detect_mortality()`, the report adds them to its summary. The
@@ -376,18 +346,11 @@ basename(report)
 if (interactive()) utils::browseURL(report)
 ```
 
-```{r report-counts, include = FALSE, purl = FALSE}
-log_steps <- detset_log(dets)
-```
+Figure 1, at the top of the page, is the top of that report.
 
-Figure 1, at the top of the page, is the top of that report. Given `bands`, it adds the
-`detect_mortality` step that made them to the log, so it lists `r nrow(log_steps) + 1` steps where
-`detset_log(dets)` lists `r nrow(log_steps)`.
-
-The Get started page writes this report from the same steps and one more, the review cards, and the
-site keeps it: [the processing report](../example/processing_report.html), with
-[the four review cards](../example/mortality_review/index.html), one for each of ST-01 to ST-04,
-that the Get started page writes for its mortality review.
+The site keeps the report of the Get started page: [the processing
+report](../example/processing_report.html), with [the four review
+cards](../example/mortality_review/index.html).
 
 ## Back into detqc
 
@@ -395,7 +358,7 @@ that the Get started page writes for its mortality review.
 started in either can be checked and logged here. Without a receiver table it infers the
 deployments from the detections, 14 here against 20 deployed, and the log says so. An inferred
 deployment cannot show when a receiver listened and heard nothing. Give the **glatos** receiver table
-as `receivers` to keep every deployment; the block reads it with **glatos** when **glatos** is installed.
+as `receivers` to keep every deployment.
 
 ```{r back}
 # Rebuild a detection set from the glatos detections alone

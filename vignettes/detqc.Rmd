@@ -39,10 +39,7 @@ nw <- function(n) {
                 "eight",
                 "nine")[n + 1] else big(n)
 }
-# The mortality rules of step 6, scaled to the study, for the caption of
-# the card below; step 6 checks that it builds the same settings.
-card_rules <- detqc::mortality_rules(min_days = 3, min_calendar_days = 3,
-                                     min_flat_days = 2, within_days = 2)
+# The length of the study in days, for the caption of the card below.
 study_days <- local({
   d <- as.Date(detqc::detqc_example$detections$datetime, tz = "UTC")
   as.integer(max(d) - min(d)) + 1L
@@ -61,11 +58,7 @@ with its counts.
 <figure style="flex: 1; margin: 0;">
 <a href="../example/mortality_review/index.html"><img src="figures/review_card_get_started.png" style="width: 100%;" alt="Screenshot of the top of the review card of ST-02: the header with its band and candidate death date, and the map of the stations that heard it."></a>
 <figcaption><em>The top of the review card of ST-02, the walleye of the example that dies on
-4 June. The example's rules are scaled to its `r nw(study_days)`-day study: a final run of
-`r card_rules$terminal_run$settings$min_days` detection days over
-`r card_rules$terminal_run$settings$min_calendar_days` calendar days,
-`r card_rules$depth_flatline$settings$min_flat_days` flat depth days, and a record end within
-`r card_rules$record_end$settings$within_days` days (step 6).
+4 June. The example's rules are scaled to its `r nw(study_days)`-day study (step 6).
 <a href="../example/mortality_review/index.html">Open the four review cards</a>.</em></figcaption>
 </figure>
 <figure style="flex: 1; margin: 0;">
@@ -145,16 +138,14 @@ plot_receivers(dets, water = lake) + theme_positionr(base_size = 13)
 stations <- plot_receivers(dets, water = lake)$data
 heard_none <- stations$detections == 0
 silent_ids <- sort(stations$station_id[heard_none])
-# The caption and the alt text place the silent stations, and the alt text
-# counts six; the knit stops when either changes.
+# The alt text places the silent stations and counts six; the knit stops
+# when either changes.
 stopifnot(length(silent_ids) == 6,
           all(stations$deploy_lat[heard_none] > median(stations$deploy_lat)),
           all(stations$deploy_lon[heard_none] > median(stations$deploy_lon)))
 ```
 
-*`plot_receivers()` on the detection set: the `r nrow(stations)` stations over the depth of
-Stoney Lake, sized by the detections each heard; the `r nw(length(silent_ids))` stations that
-heard none all lie north and east of the median station latitude and longitude.*
+*The `r nrow(stations)` stations of the example; `r nw(length(silent_ids))` heard none.*
 
 Every positionR map draws a receiver as a ring in the three colours of `positionr_ring_colours()`,
 so a map from **detqc** matches one from **detfield** or **arraydesign**.
@@ -206,8 +197,8 @@ recovery.*
 
 `audit_listening()` gives each receiver and day a listening status, which the
 [**detfield**](https://jakebrownscombe.github.io/detfield/) R package, the positioning component of
-positionR, reads. It runs before the filters, because a detection the filters remove, an isolated
-one or one in the post-release window, still shows that the receiver was listening. With no
+positionR, reads. Run it before the filters: a detection a filter removes still shows that the
+receiver was listening. With no
 reference tags in this example, `known_listening` names the receivers the field records confirm
 worked; [Hand off to **detfield**](exporting.html#hand-off-to-detfield) explains each status.
 
@@ -230,8 +221,7 @@ stopifnot(nrow(dets$listening) < deployed_days)
 ```
 
 The audit covers the `r nw(audit_days)` UTC days from the first to the last detection: `r big(nrow(dets$listening))`
-of the `r big(deployed_days)` receiver-days deployed. The days a receiver spent in the water
-outside the span of the detections hold no data to audit.
+of the `r big(deployed_days)` receiver-days deployed.
 
 A silent day, a full day with no detection, still counts as listening here, because the field
 records confirm the receiver worked. Receiver logs, where you have them, show which receivers were
@@ -254,13 +244,10 @@ tagging.
 dets <- filter_post_release(dets, hours = 6)
 ```
 
-`filter_min_lag()` removes false detections, those isolated in time on their receiver: a
-detection whose nearest neighbour in time, among the detections of its transmitter on its
-receiver, is more than a threshold away, or that has none. Following Pincock (2012), the threshold is 30 times the
-average delay of the tags. The example's tag sheet, read in step 1, gives every tag a delay of
-`r min(animals$min_delay)` to `r max(animals$max_delay)` s, an average of
-`r mean((animals$min_delay + animals$max_delay) / 2)` s, so the threshold is
-`r big(30 * mean((animals$min_delay + animals$max_delay) / 2))` s. [Isolated
+`filter_min_lag()` removes false detections, those isolated in time: a detection with no other
+detection of its transmitter on its receiver within a threshold. Following Pincock (2012), the threshold is
+30 times the average delay of the tags,
+`r big(30 * mean((animals$min_delay + animals$max_delay) / 2))` s here. [Isolated
 detections](reading-files.html#isolated-detections-the-minimum-lag) draws the lags of this study
 against it.
 
@@ -279,30 +266,6 @@ dets <- filter_min_lag(dets, max_lag_s = max_lag)
 # Print the log so far: detections before and after each step
 detset_log(dets)[, c("step", "rows_before", "rows_after", "removed")]
 ```
-
-```{r filter-counts, include = FALSE}
-log_now <- detset_log(dets)
-removed_by <- function(step) log_now$removed[log_now$step == step]
-```
-
-The post-release window removed `r big(removed_by("filter_post_release"))` detections,
-`filter_min_lag()` `r big(removed_by("filter_min_lag"))`, and `filter_duplicates()`
-`r if (removed_by("filter_duplicates") == 0) "none" else big(removed_by("filter_duplicates"))`.
-
-```{r audit-after-filters, include = FALSE, purl = FALSE}
-# Audit the filtered set again, to count the receiver-days the filters would
-# have turned from listening to silent had the audit run after them
-rx <- unique(dets$deployments$receiver_serial)
-late <- audit_listening(dets, known_listening = rx)$listening
-key <- function(l) paste(l$receiver_serial, l$date)
-late_status <- late$status[match(key(dets$listening), key(late))]
-lost_days <- sum(dets$listening$status == "listening" & late_status == "silent")
-stopifnot(lost_days > 0)
-```
-
-Run after these filters, the audit would have read `r nw(lost_days)` of the
-`r big(nrow(dets$listening))` receiver-days as silent that step 4 reads as listening: on each,
-the filters removed every detection the set held for that receiver and day.
 
 ## 6. Detect and review mortality
 
@@ -326,12 +289,6 @@ bands$bands[, c("animal_id", "band", "deciding_rule", "death_date")]
 stopifnot(identical(as.vector(table(bands$bands$band)[c("dead", "review")]),
                     c(1L, 3L)),
           bands$bands$band[bands$bands$animal_id == "ST-02"] == "dead")
-```
-
-```{r rules-check, include = FALSE, purl = FALSE}
-# The caption of the card at the top reads card_rules; it must match
-stopifnot(identical(lapply(card_rules, `[[`, "settings"),
-                    lapply(mort_rules, `[[`, "settings")))
 ```
 
 ST-02 falls in the dead band and the other three in review; [Flag: sort the animals into
@@ -422,7 +379,6 @@ draws.
 
 ```{r attrition-log, include = FALSE}
 log_steps <- detset_log(dets)
-breach_n <- sum(plot_attrition(dets)$data$breach)
 cut_n <- log_steps$removed[log_steps$step == "filter_mortality"]
 ```
 
@@ -431,13 +387,11 @@ cut_n <- log_steps$removed[log_steps$step == "filter_mortality"]
 plot_attrition(dets) + theme_positionr(base_size = 13)
 ```
 
-*`plot_attrition()`: the detections left after each of the `r nrow(log_steps)` logged steps, with
-the number each step removed; the dashed line marks the `r big(log_steps$rows_before[1])` that came
-in. `r if (breach_n == 0) "No step breaks the log's arithmetic." else sprintf("%s steps break the log's arithmetic, as the key marks them.", nw(breach_n))`*
+*The detections left after each of the `r nrow(log_steps)` logged steps, from
+`r big(log_steps$rows_before[1])` read.*
 
-The mortality cut removed `r big(cut_n)` detections, `r if (cut_n > sum(log_steps$removed) - cut_n) "more than every other step together" else "fewer than the other steps together"`. The set that leaves this page
-holds `r big(tail(log_steps$rows_after, 1))` detections, and every article that hands the Stoney
-set on, and the included `stoney_clean`, holds the same.
+The mortality cut removed `r big(cut_n)` detections, `r if (cut_n > sum(log_steps$removed) - cut_n) "more than every other step together" else "fewer than the other steps together"`. The set now
+holds `r big(tail(log_steps$rows_after, 1))` detections, as does the included `stoney_clean`.
 
 ## References
 

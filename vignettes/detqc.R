@@ -87,10 +87,6 @@ dets <- filter_min_lag(dets, max_lag_s = max_lag)
 # Print the log so far: detections before and after each step
 detset_log(dets)[, c("step", "rows_before", "rows_after", "removed")]
 
-# ---- Filter counts ----
-log_now <- detset_log(dets)
-removed_by <- function(step) log_now$removed[log_now$step == step]
-
 # ---- Detect ----
 # Scale the temporal settings to nine days: a final run of 3 detection
 # days and 3 calendar days, 2 flat sensor days, a record end within 2 days
@@ -148,7 +144,6 @@ basename(report)
 
 # ---- Attrition log ----
 log_steps <- detset_log(dets)
-breach_n <- sum(plot_attrition(dets)$data$breach)
 cut_n <- log_steps$removed[log_steps$step == "filter_mortality"]
 
 # ---- Attrition ----
