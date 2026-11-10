@@ -309,13 +309,24 @@ glatos_recoveries <- function(file, raw) {
   raw
 }
 
-# GLATOS names US zones without the "US/" prefix, as glatos does.
+# GLATOS names US zones without the "US/" prefix, as glatos does. The "US/"
+# names are legacy links that not every system's time-zone database carries
+# (Ubuntu ships them in a separate package since 2024), so each is mapped to
+# the zone it links to, which every database holds.
+us_zones <- c(
+  alaska = "America/Anchorage", aleutian = "America/Adak", arizona = "America/Phoenix",
+  central = "America/Chicago", "east-indiana" = "America/Indiana/Indianapolis",
+  eastern = "America/New_York", hawaii = "Pacific/Honolulu",
+  "indiana-starke" = "America/Indiana/Knox", michigan = "America/Detroit",
+  mountain = "America/Denver", pacific = "America/Los_Angeles", samoa = "Pacific/Pago_Pago"
+)
+
 glatos_zone <- function(z) {
   z <- trimws(as.character(z))
   olson <- OlsonNames()
+  us <- unname(us_zones[tolower(sub("^US/", "", z))])
   hit <- match(tolower(z), tolower(olson))
-  us <- match(tolower(paste0("US/", z)), tolower(olson))
-  out <- olson[ifelse(is.na(hit), us, hit)]
+  out <- ifelse(is.na(us), olson[hit], us)
   bad <- !is.na(z) & is.na(out)
   if (any(bad)) {
     warn_detqc("%s %s a time zone that is not in OlsonNames(), such as \"%s\"; %s %s",

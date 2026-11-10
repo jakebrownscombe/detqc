@@ -18,9 +18,9 @@ hard_build <- function(seed, code) {
 
 # The 20 hard cases of the checks and the mortality triage (seed 20261029).
 hard_cases <- local({
-  cache <- NULL
+  cache <- new.env()
   function() {
-    if (is.null(cache)) cache <<- hard_build(20261029, quote({
+    if (is.null(cache$value)) cache$value <- hard_build(20261029, quote({
 
       # ---- Study frame ----
       t_start <- as.POSIXct("2023-05-01 00:00:00", tz = "UTC")
@@ -253,15 +253,15 @@ hard_cases <- local({
                             cases = cases_df)
       detqc_example
     }))
-    cache
+    cache$value
   }
 })
 
 # The 20 hard cases of the mortality rule streams (seed 20261030).
 hard_mortality <- local({
-  cache <- NULL
+  cache <- new.env()
   function() {
-    if (is.null(cache)) cache <<- hard_build(20261030, quote({
+    if (is.null(cache$value)) cache$value <- hard_build(20261030, quote({
 
       # ---- Study frame ----
       t0 <- as.Date("2024-05-01")
@@ -527,6 +527,6 @@ hard_mortality <- local({
                                 animals = animals, cases = as.data.frame(case_tab))
       example_mortality
     }))
-    cache
+    cache$value
   }
 })

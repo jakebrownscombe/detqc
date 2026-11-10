@@ -27,6 +27,9 @@ jobs:
         # The page-coverage gate reads the sites of the whole suite, so it
         # cannot run on a checkout of one package; check_gates.R reports it
         # as not run.
+        # The shared runners timed examples at up to 6 s that take under 5 s
+        # on a laptop, so the example limit is 10 s here.
         env:
           POSITIONR_LONE_CHECKOUT: "1"
+          POSITIONR_EXAMPLE_SECONDS: "10"
         run: Rscript tools/check_gates.R .

@@ -1,3 +1,19 @@
+# detqc 0.1.1
+
+Repairs found by the first public checks, which run on current R on Linux, macOS and Windows.
+
+- GLATOS zone names such as "Eastern" are mapped to the zones they stand for
+  (`America/New_York`), not to the legacy `US/` names, which some systems' time-zone
+  databases no longer carry. On those systems the local times of a GLATOS file were read
+  as NA with a warning.
+- `detset()` no longer stops with a data.table type error when it builds the listening
+  table on R 4.3 or later, where a sequence of dates can be stored as integers for some
+  deployments and as doubles for others.
+- The log's times survive a Parquet round trip unchanged: `write_detset()` stores them as
+  seconds, because a Parquet timestamp holds whole microseconds.
+- `check_detset()` no longer warns from `min()` and `max()` on an empty table when no
+  detection follows a download.
+
 # detqc 0.1.0
 
 First release. Its functions are listed by task.

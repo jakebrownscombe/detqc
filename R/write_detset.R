@@ -135,7 +135,11 @@ as_plain <- function(df) {
   out
 }
 
+# `at` travels as seconds since 1970 in a double, which Parquet stores exactly;
+# a Parquet timestamp holds whole microseconds, and a time read from the clock
+# is rarely one, so it would come back changed.
 log_for_parquet <- function(lg) {
+  lg$at <- as.numeric(lg$at)
   lg$removed_by <- vapply(lg$removed_by, function(v) {
     as.character(jsonlite::toJSON(as.list(v), auto_unbox = TRUE))
   }, "")
@@ -151,6 +155,7 @@ log_from_parquet <- function(lg) {
   for (nm in c("rows_before", "rows_after", "animals_before", "animals_after", "removed")) {
     lg[[nm]] <- as.integer(lg[[nm]])
   }
+  lg$at <- as.POSIXct(as.numeric(lg$at), origin = "1970-01-01", tz = "UTC")
   lg[, log_fields]
 }
 

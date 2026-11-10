@@ -231,8 +231,15 @@ chk_detections_after_download <- function(ctx) {
   idx <- after_download_index(dep, ctx$det)
   hit <- !is.na(idx)
   late <- data.table::data.table(i = idx[hit], t = ctx$det$datetime[hit])
-  per <- late[, list(n = .N, first = min(t), last = max(t),
-                     days = length(unique(as.Date(t)))), by = "i"]
+  # With no late detection, data.table would still evaluate min() and max()
+  # on an empty group to learn the column types, and each would warn.
+  per <- if (nrow(late)) {
+    late[, list(n = .N, first = min(t), last = max(t),
+                days = length(unique(as.Date(t)))), by = "i"]
+  } else {
+    data.table::data.table(i = integer(), n = integer(), first = empty_utc(),
+                           last = empty_utc(), days = integer())
+  }
   data.table::setorderv(per, "i")
   rows <- dep_rows(ctx, per$i, detections_after = per$n, first_after = per$first,
                    last_after = per$last, days_after = per$days)

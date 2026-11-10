@@ -758,7 +758,11 @@ build_listening <- function(dep, det) {
     return(data.frame(receiver_serial = character(), station_id = character(),
                       date = as.Date(character())))
   }
-  out <- d[, list(date = seq(d0, d1, by = "day")),
+  # Every group's dates are stored as doubles: seq() on Date returns an
+  # integer-backed Date for some ranges and a double-backed one for others,
+  # and data.table refuses a column whose storage type changes by group.
+  out <- d[, list(date = as.Date(as.numeric(d0) + seq.int(0L, as.numeric(d1 - d0)),
+                                 origin = "1970-01-01")),
            by = list(receiver_serial, station_id, k = seq_len(nrow(d)))]
   out <- unique(out[, list(receiver_serial, station_id, date)])
   data.table::setorderv(out, c("receiver_serial", "date"))

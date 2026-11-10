@@ -8,7 +8,6 @@
 # invented; the stations, serials and tags exist nowhere.
 # Needs openxlsx.
 
-library(openxlsx)
 utc <- function(s) as.POSIXct(s, tz = "UTC")
 
 # ---- Tables ----
@@ -39,18 +38,20 @@ nrow(deployments)  # deployments written
 nrow(tagging)  # animals written
 
 # ---- Workbook ----
-wb <- createWorkbook()
-addWorksheet(wb, "Notes")
-writeData(wb, "Notes", c("Synthetic OTN metadata workbook for the detqc tests.",
-                         "No value in it describes a real station, receiver or animal."))
+wb <- openxlsx::createWorkbook()
+openxlsx::addWorksheet(wb, "Notes")
+openxlsx::writeData(wb, "Notes", c(
+  "Synthetic OTN metadata workbook for the detqc tests.",
+  "No value in it describes a real station, receiver or animal."
+))
 add_table <- function(sheet, title, df) {
-  addWorksheet(wb, sheet)
-  writeData(wb, sheet, title, startRow = 1)
-  writeData(wb, sheet, df, startRow = 3)
+  openxlsx::addWorksheet(wb, sheet)
+  openxlsx::writeData(wb, sheet, title, startRow = 1)
+  openxlsx::writeData(wb, sheet, df, startRow = 3)
 }
 add_table("Deployment", "Receiver deployments (synthetic)", deployments)
 add_table("Tagging", "Tag releases (synthetic)", tagging)
 out <- "tests/testthat/fixtures/otn_workbook_example.xlsx"
-saveWorkbook(wb, out, overwrite = TRUE)
+openxlsx::saveWorkbook(wb, out, overwrite = TRUE)
 file.size(out)  # bytes written
 names(loadWorkbook(out))  # sheets written

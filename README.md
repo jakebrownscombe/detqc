@@ -113,7 +113,7 @@ Brownscombe J (2026). positionR: tools for acoustic telemetry studies. R
 package version 2.0.0, <https://jakebrownscombe.github.io/positionR/>.
 
 Brownscombe J (2026). detqc: Quality Control and Mortality Review for
-Telemetry Detections. R package version 0.1.0.
+Telemetry Detections. R package version 0.1.1.
 <https://jakebrownscombe.github.io/detqc/>
 
 ## How the code was written

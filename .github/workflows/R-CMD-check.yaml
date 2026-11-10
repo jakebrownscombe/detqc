@@ -61,6 +61,9 @@ jobs:
         with:
           r-version: release
           use-public-rspm: true
+          # glatos is a suggested package from r-universe. It is not installed
+          # here, but the resolver still has to find it, or it stops.
+          extra-repositories: https://ocean-tracking-network.r-universe.dev
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           dependencies: '"hard"'

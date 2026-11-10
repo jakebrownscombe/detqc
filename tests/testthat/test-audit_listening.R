@@ -316,8 +316,12 @@ test_that("check_detset() counts the detections after the download per deploymen
   # detection is gone, and does not run without download times.
   y <- x
   y$detections <- y$detections[!y$detections$after_download, ]
-  expect_equal(check_detset(y, checks = "detections_after_download")$checks$summary$status,
-               "pass")
+  # The row is dropped with no log record, which the next step reports.
+  expect_warning(
+    after <- check_detset(y, checks = "detections_after_download")$checks$summary$status,
+    "with no log record"
+  )
+  expect_equal(after, "pass")
   ex <- detqc_example
   no_dl <- check_detset(detset(ex$detections, ex$deployments),
                         checks = "detections_after_download")$checks$summary
