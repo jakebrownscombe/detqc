@@ -6,10 +6,10 @@
 [![License: GPL (\>=
 3)](https://img.shields.io/badge/license-GPL%20(%3E%3D%203)-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-**detqc** reads detection files from OTN, GLATOS and InnovaSea (VUE and
-Fathom VDAT) and tagging and receiver deployment files from OTN and
-GLATOS, runs a range of data checks and filters, reviews mortality, and
-generates a processing report. It writes the result for the
+**detqc** reads detection files from OTN, GLATOS and InnovaSea, and
+tagging and receiver deployment files from OTN and GLATOS, runs a range
+of data checks and filters, reviews mortality, and generates a
+processing report. It writes the result for the
 [**detfield**](https://jakebrownscombe.github.io/detfield/) R package,
 the [**glatos**](https://ocean-tracking-network.github.io/glatos/) and
 [**actel**](https://actel.trackyverse.org/) R packages, or the ATO
